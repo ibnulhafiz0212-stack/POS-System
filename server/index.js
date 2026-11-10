@@ -47,11 +47,6 @@ app.use((req, res, next) => {
 
 app.use(express.json({ limit: '2mb' }));
 
-const generateProductQrValue = (name, id) => {
-  const safeSlug = String(name || 'product').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'product';
-  return `retrobit://product/${id || Date.now()}/${safeSlug}`;
-};
-
 const defaultProducts = [];
 
 const defaultOrders = [
@@ -78,8 +73,7 @@ const productSchema = new mongoose.Schema({
   name: { type: String, required: true },
   price: { type: Number, required: true },
   category: { type: String, required: true },
-  image: { type: String, default: '' },
-  qrValue: { type: String, default: '' }
+  image: { type: String, default: '' }
 }, { timestamps: true });
 
 const orderSchema = new mongoose.Schema({
@@ -197,8 +191,7 @@ app.post('/api/products', async (req, res) => {
       name: payload.name,
       price: Number(payload.price),
       category: payload.category,
-      image: payload.image || '',
-      qrValue: payload.qrValue || `retrobit://product/${Number(payload.id ?? Date.now())}/${String(payload.name || 'product').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'product'}`
+      image: payload.image || ''
     };
 
     if (isDatabaseReady()) {
@@ -220,8 +213,7 @@ app.put('/api/products/:id', async (req, res) => {
     const updatedData = {
       ...payload,
       id,
-      price: Number(payload.price),
-      qrValue: payload.qrValue || `retrobit://product/${id}/${String(payload.name || 'product').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'product'}`
+      price: Number(payload.price)
     };
 
     if (isDatabaseReady()) {

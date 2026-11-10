@@ -3,17 +3,6 @@ import { QRCodeSVG } from 'qrcode.react';
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5001').replace(/\/+$/, '');
 
-const generateProductQrValue = (name, id) => {
-  const safeSlug = String(name || 'product').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'product';
-  return `retrobit://product/${id || Date.now()}/${safeSlug}`;
-};
-
-const generateTableQrValue = (table) => {
-  const label = typeof table?.name === 'string' ? table.name : 'table';
-  const safeSlug = String(label).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'table';
-  return `retrobit://table/${table?.id ?? Date.now()}/${safeSlug}`;
-};
-
 const fallbackProducts = [];
 
 const fallbackOrders = [
@@ -40,6 +29,10 @@ const safeJSON = (key, fallback) => {
   }
 };
 
+const slugify = (value) => String(value || 'item').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'item';
+const buildTableQrValue = (table) => `retrobit://table/${table.id}/${slugify(table.name || 'table')}`;
+const buildProductQrValue = (product) => `retrobit://product/${product.id}/${slugify(product.name || 'product')}`;
+
 function App() {
   const [products, setProducts] = useState(fallbackProducts);
   const [orders, setOrders] = useState(fallbackOrders);
@@ -57,8 +50,10 @@ function App() {
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [draftModalOpen, setDraftModalOpen] = useState(false);
   const [drafts, setDrafts] = useState(() => safeJSON('retrobitDrafts', []));
+  const [qrScanValue, setQrScanValue] = useState('');
+  const [qrCodeModal, setQrCodeModal] = useState(null);
   const [loginForm, setLoginForm] = useState({ email: 'admin@retrobit.com', password: 'admin123' });
-  const [productForm, setProductForm] = useState({ id: '', name: '', category: '', price: '', image: '', qrValue: '' });
+  const [productForm, setProductForm] = useState({ id: '', name: '', category: '', price: '', image: '' });
   const [tableFilter, setTableFilter] = useState('all');
   const [selectedTableId, setSelectedTableId] = useState(1);
   const [tables, setTables] = useState(() => safeJSON('retrobitTables', [
@@ -115,60 +110,6 @@ function App() {
     };
   }, [orders, products]);
 
-  const [qrMenuOrders, setQrMenuOrders] = useState([
-    { id: 1, table: 'Table 2', customer: 'Walk-in Guest', items: 'Chicken Burger • Soda', total: 28, status: 'New' },
-    { id: 2, table: 'Table 5', customer: 'Family Table', items: 'Veg Pizza • Fries', total: 36, status: 'Preparing' },
-    { id: 3, table: 'Table 6', customer: 'Group Table', items: 'Mango Shake • Salad', total: 22, status: 'Ready' },
-  ]);
-  const [qrMenuFilter, setQrMenuFilter] = useState('All');
-  const [qrOrderForm, setQrOrderForm] = useState({ table: 'Table 2', customer: '', items: '', total: '18' });
-  const [showQrForm, setShowQrForm] = useState(false);
-  const [qrScanModalOpen, setQrScanModalOpen] = useState(false);
-  const [qrScanValue, setQrScanValue] = useState('');
-  const [qrPrintModalOpen, setQrPrintModalOpen] = useState(false);
-  const [tableQrModalOpen, setTableQrModalOpen] = useState(false);
-
-  const filteredQrMenuOrders = useMemo(() => {
-    if (qrMenuFilter === 'All') return qrMenuOrders;
-    return qrMenuOrders.filter((order) => order.status === qrMenuFilter);
-  }, [qrMenuFilter, qrMenuOrders]);
-
-  const qrStats = useMemo(() => ({
-    total: qrMenuOrders.length,
-    newOrders: qrMenuOrders.filter((order) => order.status === 'New').length,
-    preparing: qrMenuOrders.filter((order) => order.status === 'Preparing').length,
-    ready: qrMenuOrders.filter((order) => order.status === 'Ready').length,
-  }), [qrMenuOrders]);
-
-  const advanceQrOrderStatus = (orderId) => {
-    setQrMenuOrders((prev) => prev.map((order) => {
-      if (order.id !== orderId) return order;
-      if (order.status === 'New') return { ...order, status: 'Preparing' };
-      if (order.status === 'Preparing') return { ...order, status: 'Ready' };
-      return { ...order, status: 'Completed' };
-    }));
-  };
-
-  const handleQrOrderSubmit = (event) => {
-    event.preventDefault();
-    const customer = qrOrderForm.customer.trim() || 'New Customer';
-    const items = qrOrderForm.items.trim() || 'Chef Special';
-    const total = Number(qrOrderForm.total) || 0;
-
-    const nextOrder = {
-      id: Date.now(),
-      table: qrOrderForm.table,
-      customer,
-      items,
-      total,
-      status: 'New',
-    };
-
-    setQrMenuOrders((prev) => [nextOrder, ...prev]);
-    setQrOrderForm({ table: 'Table 2', customer: '', items: '', total: '18' });
-    setShowQrForm(false);
-    setQrMenuFilter('All');
-  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -275,57 +216,6 @@ function App() {
     setCurrentOrder([]);
   };
 
-  const handleGenerateQr = () => {
-    const nextId = Number(productForm.id || Date.now());
-    const nextQrValue = productForm.qrValue || generateProductQrValue(productForm.name || 'New Product', nextId);
-    setProductForm((prev) => ({ ...prev, qrValue: nextQrValue }));
-  };
-
-  const handleQrScan = () => {
-    const normalized = qrScanValue.trim();
-    if (!normalized) {
-      alert('Please scan or enter a QR code value first.');
-      return;
-    }
-
-    const scannedTable = tables.find((table) => {
-      const value = generateTableQrValue(table);
-      return value === normalized || value.includes(normalized) || normalized.includes(`/table/${table.id}/`);
-    });
-
-    if (scannedTable) {
-      setSelectedTableId(scannedTable.id);
-      setView('table');
-      setQrScanModalOpen(false);
-      setQrScanValue('');
-      alert(`${scannedTable.name} selected. The table order is ready to receive guest orders.`);
-      return;
-    }
-
-    const scannedProduct = products.find((product) => product.qrValue === normalized || product.qrValue?.includes(normalized));
-
-    if (!scannedProduct) {
-      alert('QR code not found. Please use a valid product or table QR code.');
-      return;
-    }
-
-    addToOrder(scannedProduct.id);
-    setQrMenuOrders((prev) => prev.map((order) => {
-      const matchesProduct = order.items.toLowerCase().includes(scannedProduct.name.toLowerCase());
-      const matchesCustomer = order.customer?.toLowerCase() === customerName.toLowerCase();
-      const matchesTable = selectedTable?.name && order.table === selectedTable.name;
-
-      if ((matchesProduct || matchesCustomer || matchesTable) && order.status !== 'Completed') {
-        return { ...order, status: 'Completed' };
-      }
-      return order;
-    }));
-    setQrScanModalOpen(false);
-    setQrScanValue('');
-    setView('pos');
-    alert(`${scannedProduct.name} was confirmed, added to the current order, and the matching QR order was completed.`);
-  };
-
   const handleProductSubmit = async (event) => {
     event.preventDefault();
 
@@ -336,7 +226,6 @@ function App() {
       category: productForm.category,
       price: Number(productForm.price),
       image: productForm.image,
-      qrValue: productForm.qrValue || generateProductQrValue(productForm.name, finalId),
     };
 
     try {
@@ -373,7 +262,7 @@ function App() {
       });
     }
 
-    setProductForm({ id: '', name: '', category: '', price: '', image: '', qrValue: '' });
+    setProductForm({ id: '', name: '', category: '', price: '', image: '' });
   };
 
   const handleEditProduct = (product) => {
@@ -383,7 +272,6 @@ function App() {
       category: product.category,
       price: String(product.price),
       image: product.image || '',
-      qrValue: product.qrValue || generateProductQrValue(product.name, product.id),
     });
   };
 
@@ -418,6 +306,34 @@ function App() {
     setCurrentOrder(draft.items ?? []);
     setDraftModalOpen(false);
     setView('pos');
+  };
+
+  const handleGoogleLogin = () => {
+    const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+
+    if (googleClientId && window.google?.accounts?.id) {
+      const callback = (response) => {
+        const payload = response?.credential ? JSON.parse(atob(response.credential.split('.')[1] || '')) : {};
+        if (payload.email) {
+          setLoginForm((prev) => ({ ...prev, email: payload.email }));
+        }
+        setIsLoggedIn(true);
+        setLoginModalOpen(false);
+        setView(pendingView || 'admin');
+      };
+
+      window.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback,
+      });
+      window.google.accounts.id.prompt();
+      return;
+    }
+
+    setIsLoggedIn(true);
+    setLoginModalOpen(false);
+    setView(pendingView || 'admin');
+    alert('Google login is ready. Add VITE_GOOGLE_CLIENT_ID in your env to enable real Google OAuth.');
   };
 
   const handleLoginSubmit = async (event) => {
@@ -524,6 +440,57 @@ function App() {
   const selectedTable = tables.find((table) => table.id === selectedTableId) || null;
   const selectedTableOrder = tableOrders[selectedTableId] || [];
   const selectedTableSubtotal = selectedTableOrder.reduce((sum, item) => sum + Number(item.price) * Number(item.qty), 0);
+  const qrProducts = useMemo(() => products.map((product) => ({
+    ...product,
+    qrValue: product.qrValue || buildProductQrValue(product),
+  })), [products]);
+  const qrTables = useMemo(() => tables.map((table) => ({
+    ...table,
+    qrValue: table.qrValue || buildTableQrValue(table),
+  })), [tables]);
+
+  const handleQrScan = (value) => {
+    const rawValue = (value || '').trim();
+    if (!rawValue) {
+      alert('Scan or paste a valid table or product QR code first.');
+      return;
+    }
+
+    const tableMatch = rawValue.match(/retrobit:\/\/table\/(\d+)(?:\/|$)/i);
+    if (tableMatch) {
+      const tableId = Number(tableMatch[1]);
+      const targetTable = tables.find((table) => table.id === tableId) || tables[0];
+      if (!targetTable) {
+        alert('The scanned table was not found.');
+        return;
+      }
+      setSelectedTableId(targetTable.id);
+      setView('table');
+      setQrScanValue('');
+      alert(`Table ${targetTable.name} selected from QR.`);
+      return;
+    }
+
+    const productMatch = rawValue.match(/retrobit:\/\/product\/(\d+)(?:\/|$)/i);
+    if (productMatch) {
+      const productId = Number(productMatch[1]);
+      const product = products.find((item) => item.id === productId);
+      if (!product) {
+        alert('The scanned product was not found in inventory.');
+        return;
+      }
+      if (selectedTable) {
+        addToTableOrder(product.id);
+      } else {
+        addToOrder(product.id);
+      }
+      setQrScanValue('');
+      alert(`${product.name} added from QR.`);
+      return;
+    }
+
+    alert('Unsupported QR code. Use a valid RetroBit table or product QR.');
+  };
 
   const handleTableStatusChange = (tableId, nextStatus) => {
     setTables((prev) => prev.map((table) => (
@@ -666,7 +633,6 @@ function App() {
   const navItems = [
     { key: 'dashboard', label: 'Dashboard', icon: '⌂' },
     { key: 'pos', label: 'POS', icon: '◫' },
-    { key: 'qr-menu', label: 'QR Menu', icon: '◌' },
     { key: 'table', label: 'Table', icon: '▣' },
     { key: 'reservations', label: 'Reservations', icon: '✦' },
     { key: 'admin', label: 'Admin', icon: '⚙' },
@@ -738,12 +704,12 @@ function App() {
             <div className="flex flex-col gap-4 rounded-2xl bg-white/50 px-4 py-4 shadow-sm ring-1 ring-slate-200/80 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <h1 className="text-2xl font-bold tracking-[-0.04em] text-slate-900 lg:text-[2rem]">
-                  {view === 'dashboard' ? 'Dashboard Overview' : view === 'admin' ? 'Admin Panel' : view === 'reports' ? 'Reports' : view === 'settings' ? 'Settings' : view === 'table' ? 'Table Management' : view === 'reservations' ? 'Reservations' : view === 'qr-menu' ? 'QR Menu Orders' : 'Point of Sale (POS)'}
+                  {view === 'dashboard' ? 'Dashboard Overview' : view === 'admin' ? 'Admin Panel' : view === 'reports' ? 'Reports' : view === 'settings' ? 'Settings' : view === 'table' ? 'Table Management' : view === 'reservations' ? 'Reservations' : 'Point of Sale (POS)'}
                 </h1>
                 <div className="mt-1 flex items-center gap-2 text-sm text-slate-500">
                   <span>Dashboard</span>
                   <span>•</span>
-                  <span className="font-medium text-slate-700">{view === 'dashboard' ? 'Dashboard' : view === 'admin' ? 'Admin' : view === 'reports' ? 'Reports' : view === 'settings' ? 'Settings' : view === 'table' ? 'Table' : view === 'reservations' ? 'Reservations' : view === 'qr-menu' ? 'QR Menu' : 'POS'}</span>
+                  <span className="font-medium text-slate-700">{view === 'dashboard' ? 'Dashboard' : view === 'admin' ? 'Admin' : view === 'reports' ? 'Reports' : view === 'settings' ? 'Settings' : view === 'table' ? 'Table' : view === 'reservations' ? 'Reservations' : 'POS'}</span>
                 </div>
               </div>
 
@@ -761,205 +727,10 @@ function App() {
                 >
                   {view === 'table' ? '+ New Table' : '+ New'}
                 </button>
-                <button type="button" onClick={() => setView('qr-menu')} className={`rounded-xl border px-4 py-2 text-sm font-medium transition ${view === 'qr-menu' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white text-slate-700'}`}>
-                  QR Menu Orders
-                </button>
-                <button type="button" onClick={() => setQrScanModalOpen(true)} className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700">Scan QR</button>
-                <button type="button" onClick={() => setShowQrForm(true)} className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700">+ Add QR Order</button>
                 <button type="button" onClick={() => setDraftModalOpen(true)} className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700">Draft List</button>
                 <button type="button" onClick={() => setView('table')} className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700">Table Order</button>
               </div>
             </div>
-
-            {view === 'qr-menu' && (
-              <div className="grid gap-5 xl:grid-cols-[1.45fr_0.75fr]">
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <h2 className="text-lg font-semibold text-slate-800">QR Menu Orders</h2>
-                      <p className="text-sm text-slate-500">Live food requests from the QR menu.</p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">{qrStats.total} active</span>
-                      <button type="button" onClick={() => setShowQrForm(true)} className="rounded-full bg-slate-900 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white">Add order</button>
-                    </div>
-                  </div>
-
-                  <div className="mb-4 flex flex-wrap gap-2">
-                    {['All', 'New', 'Preparing', 'Ready', 'Completed'].map((filter) => (
-                      <button
-                        key={filter}
-                        type="button"
-                        onClick={() => setQrMenuFilter(filter)}
-                        className={`rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] ${
-                          qrMenuFilter === filter ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
-                        }`}
-                      >
-                        {filter}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="space-y-3">
-                    {filteredQrMenuOrders.length === 0 ? (
-                      <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">No QR orders in this status</div>
-                    ) : filteredQrMenuOrders.map((order) => {
-                      const statusStyles = {
-                        New: 'bg-amber-100 text-amber-700',
-                        Preparing: 'bg-blue-100 text-blue-700',
-                        Ready: 'bg-emerald-100 text-emerald-700',
-                        Completed: 'bg-slate-200 text-slate-700',
-                      };
-
-                      return (
-                        <div key={order.id} className="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-50 to-white p-3 shadow-sm">
-                          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <div className="text-base font-semibold text-slate-800">{order.table}</div>
-                                <span className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${statusStyles[order.status] || 'bg-slate-100 text-slate-700'}`}>
-                                  {order.status}
-                                </span>
-                              </div>
-                              <div className="mt-1 text-sm text-slate-600">{order.customer}</div>
-                              <div className="mt-2 text-xs text-slate-500">{order.items}</div>
-                            </div>
-
-                            <div className="flex items-center gap-3">
-                              <div className="text-right">
-                                <div className="text-sm font-bold text-slate-900">{currency.format(order.total)}</div>
-                                <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Order</div>
-                              </div>
-                              <button type="button" onClick={() => advanceQrOrderStatus(order.id)} className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800">
-                                {order.status === 'New' ? 'Accept' : order.status === 'Preparing' ? 'Mark Ready' : order.status === 'Ready' ? 'Complete' : 'Done'}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <div>
-                    <h2 className="text-lg font-semibold text-slate-800">QR Menu Setup</h2>
-                    <div className="mt-5 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 text-white shadow-lg">
-                      <div className="mx-auto grid h-36 w-36 place-items-center rounded-2xl bg-white text-[10px] font-bold text-slate-900 shadow-inner">
-                        QR
-                      </div>
-                      <div className="mt-4 text-center text-sm font-medium">Scan menu</div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3 text-sm text-slate-600">
-                    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>Live scans</span><strong className="text-slate-900">{qrStats.total}</strong></div>
-                    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>New</span><strong className="text-slate-900">{qrStats.newOrders}</strong></div>
-                    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>Preparing</span><strong className="text-slate-900">{qrStats.preparing}</strong></div>
-                    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>Ready</span><strong className="text-slate-900">{qrStats.ready}</strong></div>
-                  </div>
-
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Menu status</div>
-                    <div className="mt-2 flex items-center justify-between">
-                      <span className="text-sm font-medium text-slate-700">Ready to serve</span>
-                      <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-700">Online</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {qrScanModalOpen && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-                <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
-                  <div className="mb-4 flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-slate-800">Scan Product QR</h2>
-                    <button type="button" onClick={() => setQrScanModalOpen(false)} className="text-sm font-medium text-slate-500">Close</button>
-                  </div>
-                  <label className="block text-sm font-medium text-slate-700">
-                    QR value
-                    <input value={qrScanValue} onChange={(event) => setQrScanValue(event.target.value)} placeholder="retrobit://product/5/chicken-burger" className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-800 outline-none" />
-                  </label>
-                  <div className="mt-4 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
-                    Add a product QR from inventory. Matching product will be confirmed and added to the current POS order.
-                  </div>
-                  <div className="mt-5 flex gap-3">
-                    <button type="button" onClick={() => setQrScanModalOpen(false)} className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700">Cancel</button>
-                    <button type="button" onClick={handleQrScan} className="flex-1 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white">Confirm Order</button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {qrPrintModalOpen && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-                <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
-                  <div className="mb-4 flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-slate-800">Printable Product QR List</h2>
-                    <button type="button" onClick={() => setQrPrintModalOpen(false)} className="text-sm font-medium text-slate-500">Close</button>
-                  </div>
-                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {products.map((product) => (
-                      <div key={product.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-center">
-                        <div className="mb-2 flex justify-center rounded-xl bg-white p-2">
-                          <QRCodeSVG value={product.qrValue || generateProductQrValue(product.name, product.id)} size={110} bgColor="#ffffff" fgColor="#111827" />
-                        </div>
-                        <div className="text-sm font-semibold text-slate-800">{product.name}</div>
-                        <div className="text-xs text-slate-500">{currency.format(product.price)}</div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-5 flex gap-3">
-                    <button type="button" onClick={() => setQrPrintModalOpen(false)} className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700">Close</button>
-                    <button type="button" onClick={() => window.print()} className="flex-1 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white">Print List</button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {showQrForm && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-                <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
-                  <div className="mb-4 flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-slate-800">Add QR Menu Order</h2>
-                    <button type="button" onClick={() => setShowQrForm(false)} className="text-sm font-medium text-slate-500">Close</button>
-                  </div>
-
-                  <form className="space-y-4" onSubmit={handleQrOrderSubmit}>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <label className="block text-sm font-medium text-slate-700">
-                        Table
-                        <select value={qrOrderForm.table} onChange={(event) => setQrOrderForm((prev) => ({ ...prev, table: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-800 outline-none">
-                          {tables.map((table) => (
-                            <option key={table.id} value={table.name}>{table.name}</option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="block text-sm font-medium text-slate-700">
-                        Amount
-                        <input type="number" min="0" step="0.01" value={qrOrderForm.total} onChange={(event) => setQrOrderForm((prev) => ({ ...prev, total: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-800 outline-none" required />
-                      </label>
-                    </div>
-
-                    <label className="block text-sm font-medium text-slate-700">
-                      Customer
-                      <input value={qrOrderForm.customer} onChange={(event) => setQrOrderForm((prev) => ({ ...prev, customer: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-800 outline-none" placeholder="Walk-in Guest" />
-                    </label>
-
-                    <label className="block text-sm font-medium text-slate-700">
-                      Items
-                      <input value={qrOrderForm.items} onChange={(event) => setQrOrderForm((prev) => ({ ...prev, items: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-800 outline-none" placeholder="Chicken Burger • Soda" required />
-                    </label>
-
-                    <div className="flex gap-3">
-                      <button type="button" onClick={() => setShowQrForm(false)} className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700">Cancel</button>
-                      <button type="submit" className="flex-1 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white">Create Order</button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            )}
 
             {view === 'dashboard' && (
               <div className="space-y-6">
@@ -1027,6 +798,15 @@ function App() {
                         value={productSearch}
                         onChange={(event) => setProductSearch(event.target.value)}
                       />
+                    </div>
+                    <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-2 py-1.5">
+                      <input
+                        value={qrScanValue}
+                        onChange={(event) => setQrScanValue(event.target.value)}
+                        placeholder="Scan QR"
+                        className="w-32 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                      />
+                      <button type="button" onClick={() => handleQrScan(qrScanValue)} className="rounded-lg bg-slate-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">Scan</button>
                     </div>
                     <select className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 outline-none" value={selectedCategory} onChange={(event) => setSelectedCategory(event.target.value)}>
                       {categories.map((category) => (
@@ -1225,7 +1005,6 @@ function App() {
                             <button type="button" onClick={() => handleTableStatusChange(table.id, 'available')} className="rounded-lg bg-white px-2.5 py-1.5 text-[10px] font-semibold text-slate-700 shadow-sm">Available</button>
                             <button type="button" onClick={() => handleTableStatusChange(table.id, 'occupied')} className="rounded-lg bg-amber-100 px-2.5 py-1.5 text-[10px] font-semibold text-amber-700">Occupied</button>
                             <button type="button" onClick={() => handleTableStatusChange(table.id, 'reserved')} className="rounded-lg bg-violet-100 px-2.5 py-1.5 text-[10px] font-semibold text-violet-700">Reserved</button>
-                            <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedTableId(table.id); setTableQrModalOpen(true); }} className="rounded-lg bg-slate-900 px-2.5 py-1.5 text-[10px] font-semibold text-white">Table QR</button>
                             <button type="button" onClick={(event) => { event.stopPropagation(); handleDeleteTable(table.id); }} className="rounded-lg bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold text-red-600">Remove</button>
                           </div>
                         </div>
@@ -1258,7 +1037,22 @@ function App() {
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                     <div className="mb-3 flex items-center justify-between">
                       <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Table Order</h3>
-                      <span className="rounded-full bg-slate-900 px-2 py-1 text-[10px] font-semibold text-white">{selectedTableOrder.length} items</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!selectedTable) {
+                            alert('Please select a table first.');
+                            return;
+                          }
+                          setQrCodeModal({
+                            type: 'table',
+                            table: { ...selectedTable, qrValue: buildTableQrValue(selectedTable) },
+                          });
+                        }}
+                        className="rounded-full bg-slate-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white"
+                      >
+                        Table QR
+                      </button>
                     </div>
 
                     <div className="space-y-2">
@@ -1307,35 +1101,6 @@ function App() {
                   </div>
                 </div>
               </div>
-            )}
-
-            {tableQrModalOpen && selectedTable && (
-             <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-               <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
-                 <div className="mb-4 flex items-center justify-between">
-                   <h2 className="text-lg font-semibold text-slate-800">{selectedTable.name} QR Code</h2>
-                   <button type="button" onClick={() => setTableQrModalOpen(false)} className="text-sm font-medium text-slate-500">Close</button>
-                 </div>
-
-                 <div className="rounded-2xl bg-slate-50 p-4 text-center">
-                   <div className="mb-4 flex justify-center rounded-2xl bg-white p-3 shadow-inner ring-1 ring-slate-200">
-                     <QRCodeSVG value={generateTableQrValue(selectedTable)} size={160} bgColor="#ffffff" fgColor="#111827" />
-                   </div>
-                   <div className="text-xs uppercase tracking-[0.12em] text-slate-500">Table QR</div>
-                   <div className="mt-2 text-sm font-semibold text-slate-800">{selectedTable.name}</div>
-                   <div className="mt-1 break-all text-[11px] text-slate-500">{generateTableQrValue(selectedTable)}</div>
-                 </div>
-
-                 <div className="mt-5 flex gap-3">
-                   <button type="button" onClick={() => setTableQrModalOpen(false)} className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700">Close</button>
-                   <button type="button" onClick={() => {
-                     setTableQrModalOpen(false);
-                     setView('table');
-                     window.print();
-                   }} className="flex-1 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white">Print QR</button>
-                 </div>
-               </div>
-             </div>
             )}
 
             {newTableModalOpen && (
@@ -1497,28 +1262,9 @@ function App() {
                       />
                     </label>
 
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                      <div className="mb-2 flex items-center justify-between">
-                        <span className="text-sm font-medium text-slate-700">Product QR</span>
-                        <button type="button" onClick={handleGenerateQr} className="rounded-lg bg-slate-900 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white">Generate</button>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="grid h-24 w-24 place-items-center rounded-xl bg-white p-2 shadow-inner ring-1 ring-slate-200">
-                          {productForm.qrValue ? (
-                            <QRCodeSVG value={productForm.qrValue} size={84} bgColor="#ffffff" fgColor="#111827" />
-                          ) : (
-                            <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">No QR</span>
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1 text-xs text-slate-500 break-all">
-                          {productForm.qrValue || 'Generate a QR value for this product.'}
-                        </div>
-                      </div>
-                    </div>
-
                     <div className="flex gap-3">
                       <button type="submit" className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white">Save Product</button>
-                      <button type="button" onClick={() => setProductForm({ id: '', name: '', category: '', price: '', image: '', qrValue: '' })} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700">Cancel</button>
+                      <button type="button" onClick={() => setProductForm({ id: '', name: '', category: '', price: '', image: '' })} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700">Cancel</button>
                     </div>
                   </form>
                 </div>
@@ -1528,7 +1274,6 @@ function App() {
                     <h2 className="text-lg font-semibold text-slate-800">Inventory</h2>
                     <div className="flex items-center gap-2">
                       <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{products.length} items</span>
-                      <button type="button" onClick={() => setQrPrintModalOpen(true)} className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white">Print QR List</button>
                     </div>
                   </div>
                   <div className="overflow-hidden rounded-xl border border-slate-200">
@@ -1545,23 +1290,13 @@ function App() {
                         {products.map((product) => (
                           <tr key={product.id} className="align-middle">
                             <td className="px-4 py-3">
-                              <div className="flex items-center gap-3">
-                                <div className="grid h-10 w-10 place-items-center rounded-lg bg-white ring-1 ring-slate-200">
-                                  {product.qrValue ? (
-                                    <QRCodeSVG value={product.qrValue || generateProductQrValue(product.name, product.id)} size={24} bgColor="#ffffff" fgColor="#111827" />
-                                  ) : (
-                                    <span className="text-[8px] font-bold text-slate-500">QR</span>
-                                  )}
-                                </div>
-                                <div>
-                                  <div className="font-medium text-slate-800">{product.name}</div>
-                                </div>
-                              </div>
+                              <div className="font-medium text-slate-800">{product.name}</div>
                             </td>
                             <td className="px-4 py-3 text-slate-600">{product.category}</td>
                             <td className="px-4 py-3 font-medium text-slate-800">{currency.format(product.price)}</td>
                             <td className="px-4 py-3">
                               <div className="flex gap-2">
+                                <button type="button" onClick={() => setQrCodeModal({ type: 'product', product: { ...product, qrValue: product.qrValue || buildProductQrValue(product) } })} className="rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700">QR</button>
                                 <button type="button" onClick={() => handleEditProduct(product)} className="rounded-lg bg-slate-100 px-2.5 py-1.5 text-xs font-semibold text-slate-700">Edit</button>
                                 <button type="button" onClick={() => handleDeleteProduct(product.id)} className="rounded-lg bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-600">Delete</button>
                               </div>
@@ -1700,6 +1435,34 @@ function App() {
        </div>
       )}
 
+      {qrCodeModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <div className="text-xs uppercase tracking-[0.14em] text-slate-500">{qrCodeModal.type === 'table' ? 'Table QR' : 'Product QR'}</div>
+                <h2 className="mt-1 text-xl font-bold text-slate-900">{qrCodeModal.type === 'table' ? (qrCodeModal.table?.name || 'Selected table') : (qrCodeModal.product?.name || 'Product')}</h2>
+              </div>
+              <button type="button" onClick={() => setQrCodeModal(null)} className="text-sm font-medium text-slate-500">Close</button>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex justify-center rounded-xl bg-white p-3">
+                <QRCodeSVG value={qrCodeModal.type === 'table' ? (qrCodeModal.table?.qrValue || buildTableQrValue(qrCodeModal.table)) : (qrCodeModal.product?.qrValue || buildProductQrValue(qrCodeModal.product))} size={180} includeMargin />
+              </div>
+              <div className="mt-4 break-all text-center text-xs text-slate-600">
+                {qrCodeModal.type === 'table' ? (qrCodeModal.table?.qrValue || buildTableQrValue(qrCodeModal.table)) : (qrCodeModal.product?.qrValue || buildProductQrValue(qrCodeModal.product))}
+              </div>
+            </div>
+
+            <div className="mt-5 flex gap-3">
+              <button type="button" onClick={() => setQrCodeModal(null)} className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700">Close</button>
+              <button type="button" onClick={() => window.print()} className="flex-1 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white">Print QR</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {loginModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
@@ -1710,7 +1473,21 @@ function App() {
               </div>
               <button type="button" onClick={() => setLoginModalOpen(false)} className="text-xl text-slate-600">×</button>
             </div>
-            <form onSubmit={handleLoginSubmit} className="space-y-4">
+
+            <div className="space-y-4">
+              <button type="button" onClick={handleGoogleLogin} className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm">
+                <span className="text-base">G</span>
+                Continue with Google
+              </button>
+
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-slate-200" />
+                <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">or</span>
+                <div className="h-px flex-1 bg-slate-200" />
+              </div>
+            </div>
+
+            <form onSubmit={handleLoginSubmit} className="mt-4 space-y-4">
               <label className="block text-sm font-medium text-slate-700">
                 Email
                 <input
@@ -1721,7 +1498,7 @@ function App() {
                   required
                 />
               </label>
-
+ 
               <label className="block text-sm font-medium text-slate-700">
                 Password
                 <input
@@ -1732,7 +1509,7 @@ function App() {
                   required
                 />
               </label>
-
+ 
               <button type="submit" className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white">
                 Login to continue
               </button>
@@ -1740,7 +1517,6 @@ function App() {
           </div>
         </div>
       )}
-
       {draftModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
