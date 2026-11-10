@@ -126,6 +126,9 @@ function App() {
   const [qrMenuFilter, setQrMenuFilter] = useState('All');
   const [qrOrderForm, setQrOrderForm] = useState({ table: 'Table 2', customer: '', items: '', total: '18' });
   const [showQrForm, setShowQrForm] = useState(false);
+  const [qrScanModalOpen, setQrScanModalOpen] = useState(false);
+  const [qrScanValue, setQrScanValue] = useState('');
+  const [qrPrintModalOpen, setQrPrintModalOpen] = useState(false);
 
   const filteredQrMenuOrders = useMemo(() => {
     if (qrMenuFilter === 'All') return qrMenuOrders;
@@ -278,6 +281,27 @@ function App() {
     const nextId = Number(productForm.id || Date.now());
     const nextQrValue = productForm.qrValue || generateProductQrValue(productForm.name || 'New Product', nextId);
     setProductForm((prev) => ({ ...prev, qrValue: nextQrValue }));
+  };
+
+  const handleQrScan = () => {
+    const normalized = qrScanValue.trim();
+    if (!normalized) {
+      alert('Please scan or enter a product QR code value first.');
+      return;
+    }
+
+    const scannedProduct = products.find((product) => product.qrValue === normalized || product.qrValue?.includes(normalized));
+
+    if (!scannedProduct) {
+      alert('QR code not found. Please use a valid product QR code from the inventory list.');
+      return;
+    }
+
+    addToOrder(scannedProduct.id);
+    setQrScanModalOpen(false);
+    setQrScanValue('');
+    setView('pos');
+    alert(`${scannedProduct.name} was confirmed and added to the current order.`);
   };
 
   const handleProductSubmit = async (event) => {
@@ -664,6 +688,7 @@ function App() {
                 <button type="button" onClick={() => setView('qr-menu')} className={`rounded-xl border px-4 py-2 text-sm font-medium transition ${view === 'qr-menu' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white text-slate-700'}`}>
                   QR Menu Orders
                 </button>
+                <button type="button" onClick={() => setQrScanModalOpen(true)} className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700">Scan QR</button>
                 <button type="button" onClick={() => setShowQrForm(true)} className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700">+ Add QR Order</button>
                 <button type="button" onClick={() => setDraftModalOpen(true)} className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700">Draft List</button>
                 <button type="button" onClick={() => setView('table')} className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700">Table Order</button>
@@ -764,6 +789,54 @@ function App() {
                       <span className="text-sm font-medium text-slate-700">Ready to serve</span>
                       <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-700">Online</span>
                     </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {qrScanModalOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+                <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-slate-800">Scan Product QR</h2>
+                    <button type="button" onClick={() => setQrScanModalOpen(false)} className="text-sm font-medium text-slate-500">Close</button>
+                  </div>
+                  <label className="block text-sm font-medium text-slate-700">
+                    QR value
+                    <input value={qrScanValue} onChange={(event) => setQrScanValue(event.target.value)} placeholder="retrobit://product/5/chicken-burger" className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-800 outline-none" />
+                  </label>
+                  <div className="mt-4 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
+                    Add a product QR from inventory. Matching product will be confirmed and added to the current POS order.
+                  </div>
+                  <div className="mt-5 flex gap-3">
+                    <button type="button" onClick={() => setQrScanModalOpen(false)} className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700">Cancel</button>
+                    <button type="button" onClick={handleQrScan} className="flex-1 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white">Confirm Order</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {qrPrintModalOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+                <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-slate-800">Printable Product QR List</h2>
+                    <button type="button" onClick={() => setQrPrintModalOpen(false)} className="text-sm font-medium text-slate-500">Close</button>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {products.map((product) => (
+                      <div key={product.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-center">
+                        <div className="mb-2 flex justify-center rounded-xl bg-white p-2">
+                          <QRCodeSVG value={product.qrValue || generateProductQrValue(product.name, product.id)} size={110} bgColor="#ffffff" fgColor="#111827" />
+                        </div>
+                        <div className="text-sm font-semibold text-slate-800">{product.name}</div>
+                        <div className="text-xs text-slate-500">{currency.format(product.price)}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-5 flex gap-3">
+                    <button type="button" onClick={() => setQrPrintModalOpen(false)} className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700">Close</button>
+                    <button type="button" onClick={() => window.print()} className="flex-1 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white">Print List</button>
                   </div>
                 </div>
               </div>
@@ -1304,7 +1377,10 @@ function App() {
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                   <div className="mb-4 flex items-center justify-between">
                     <h2 className="text-lg font-semibold text-slate-800">Inventory</h2>
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{products.length} items</span>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{products.length} items</span>
+                      <button type="button" onClick={() => setQrPrintModalOpen(true)} className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white">Print QR List</button>
+                    </div>
                   </div>
                   <div className="overflow-hidden rounded-xl border border-slate-200">
                     <table className="min-w-full divide-y divide-slate-200 text-sm">
