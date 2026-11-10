@@ -56,18 +56,20 @@ function App() {
   const [drafts, setDrafts] = useState(() => safeJSON('retrobitDrafts', []));
   const [loginForm, setLoginForm] = useState({ email: 'admin@retrobit.com', password: 'admin123' });
   const [productForm, setProductForm] = useState({ id: '', name: '', category: '', price: '', image: '' });
-  const [tables, setTables] = useState([
-    { id: 1, name: 'Table 1', status: 'occupied', seats: 2 },
-    { id: 2, name: 'Table 2', status: 'available', seats: 4 },
-    { id: 3, name: 'Table 3', status: 'reserved', seats: 6 },
-    { id: 4, name: 'Table 4', status: 'available', seats: 2 },
-    { id: 5, name: 'Table 5', status: 'occupied', seats: 4 },
-    { id: 6, name: 'Table 6', status: 'available', seats: 8 },
-  ]);
-  const [reservations, setReservations] = useState([
+  const [tableFilter, setTableFilter] = useState('all');
+  const [selectedTableId, setSelectedTableId] = useState(1);
+  const [tables, setTables] = useState(() => safeJSON('retrobitTables', [
+    { id: 1, name: 'Table 1', status: 'occupied', seats: 2, notes: 'VIP check-in' },
+    { id: 2, name: 'Table 2', status: 'available', seats: 4, notes: 'Ready for order' },
+    { id: 3, name: 'Table 3', status: 'reserved', seats: 6, notes: 'Reservation at 7:30 PM' },
+    { id: 4, name: 'Table 4', status: 'available', seats: 2, notes: 'Quick table' },
+    { id: 5, name: 'Table 5', status: 'occupied', seats: 4, notes: 'Family group' },
+    { id: 6, name: 'Table 6', status: 'available', seats: 8, notes: 'Large party ready' },
+  ]));
+  const [reservations, setReservations] = useState(() => safeJSON('retrobitReservations', [
     { id: 1, guest: 'Nadia', phone: '+8801700000000', date: '2026-11-10', time: '19:30', seats: 4, table: 'Table 3', status: 'Confirmed' },
     { id: 2, guest: 'Rafi', phone: '+8801888888888', date: '2026-11-10', time: '20:00', seats: 2, table: 'Table 1', status: 'Pending' },
-  ]);
+  ]));
   const [reservationForm, setReservationForm] = useState({
     guest: '',
     phone: '',
@@ -160,6 +162,14 @@ function App() {
   useEffect(() => {
     localStorage.setItem('retrobitDrafts', JSON.stringify(drafts));
   }, [drafts]);
+
+  useEffect(() => {
+    localStorage.setItem('retrobitTables', JSON.stringify(tables));
+  }, [tables]);
+
+  useEffect(() => {
+    localStorage.setItem('retrobitReservations', JSON.stringify(reservations));
+  }, [reservations]);
 
   const openProtectedView = (target) => {
     if ((target === 'admin' || target === 'reports' || target === 'settings') && !isLoggedIn) {
@@ -350,11 +360,25 @@ function App() {
     alert('Order saved successfully.');
   };
 
+  const tableStats = useMemo(() => ({
+    total: tables.length,
+    available: tables.filter((table) => table.status === 'available').length,
+    occupied: tables.filter((table) => table.status === 'occupied').length,
+    reserved: tables.filter((table) => table.status === 'reserved').length,
+  }), [tables]);
+
+  const filteredTables = useMemo(() => {
+    if (tableFilter === 'all') return tables;
+    return tables.filter((table) => table.status === tableFilter);
+  }, [tableFilter, tables]);
+
   const handleTableStatusChange = (tableId, nextStatus) => {
     setTables((prev) => prev.map((table) => (
       table.id === tableId ? { ...table, status: nextStatus } : table
     )));
   };
+
+  const handleTableSelect = (tableId) => setSelectedTableId(tableId);
 
   const handleReservationSubmit = (event) => {
     event.preventDefault();
@@ -638,44 +662,88 @@ function App() {
             )}
 
             {view === 'table' && (
-              <div className="grid gap-5 xl:grid-cols-[1.4fr_0.8fr]">
+              <div className="grid gap-5 xl:grid-cols-[1.45fr_0.8fr]">
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="mb-5 flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-slate-800">Table Layout</h2>
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{tables.filter((table) => table.status === 'available').length} available</span>
+                  <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <h2 className="text-lg font-semibold text-slate-800">Table Layout</h2>
+                      <p className="text-sm text-slate-500">Manage floor activity in real time.</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {['all', 'available', 'occupied', 'reserved'].map((status) => (
+                        <button
+                          key={status}
+                          type="button"
+                          onClick={() => setTableFilter(status)}
+                          className={`rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-wide ${
+                            tableFilter === status ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          {status}
+                        </button>
+                      ))}
+                    </div>
                   </div>
+
                   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    {tables.map((table) => (
-                      <div key={table.id} className={`rounded-2xl border p-4 ${
-                        table.status === 'available' ? 'border-emerald-200 bg-emerald-50' :
-                        table.status === 'occupied' ? 'border-amber-200 bg-amber-50' :
-                        'border-violet-200 bg-violet-50'
-                      }`}>
-                        <div className="flex items-center justify-between">
-                          <span className="text-lg font-bold text-slate-800">{table.name}</span>
-                          <span className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${
-                            table.status === 'available' ? 'bg-emerald-600 text-white' :
-                            table.status === 'occupied' ? 'bg-amber-500 text-white' :
-                            'bg-violet-600 text-white'
-                          }`}>{table.status}</span>
+                    {filteredTables.map((table) => {
+                      const isSelected = selectedTableId === table.id;
+                      const statusTone = table.status === 'available'
+                        ? 'border-emerald-200 bg-emerald-50'
+                        : table.status === 'occupied'
+                          ? 'border-amber-200 bg-amber-50'
+                          : 'border-violet-200 bg-violet-50';
+
+                      return (
+                        <div
+                          key={table.id}
+                          onClick={() => handleTableSelect(table.id)}
+                          className={`cursor-pointer rounded-2xl border p-4 transition ${statusTone} ${isSelected ? 'ring-2 ring-slate-900/10 shadow-md' : ''}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-lg font-bold text-slate-800">{table.name}</span>
+                            <span className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${
+                              table.status === 'available' ? 'bg-emerald-600 text-white' :
+                              table.status === 'occupied' ? 'bg-amber-500 text-white' :
+                              'bg-violet-600 text-white'
+                            }`}>{table.status}</span>
+                          </div>
+
+                          <div className="mt-3 flex items-center justify-between text-sm text-slate-600">
+                            <span>Seats</span>
+                            <strong className="text-slate-900">{table.seats}</strong>
+                          </div>
+
+                          <div className="mt-3 text-xs text-slate-500">{table.notes}</div>
+
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            <button type="button" onClick={() => handleTableStatusChange(table.id, 'available')} className="rounded-lg bg-white px-2.5 py-1.5 text-[10px] font-semibold text-slate-700 shadow-sm">Available</button>
+                            <button type="button" onClick={() => handleTableStatusChange(table.id, 'occupied')} className="rounded-lg bg-amber-100 px-2.5 py-1.5 text-[10px] font-semibold text-amber-700">Occupied</button>
+                            <button type="button" onClick={() => handleTableStatusChange(table.id, 'reserved')} className="rounded-lg bg-violet-100 px-2.5 py-1.5 text-[10px] font-semibold text-violet-700">Reserved</button>
+                          </div>
                         </div>
-                        <div className="mt-3 text-sm text-slate-600">Seats: {table.seats}</div>
-                        <div className="mt-4 flex gap-2">
-                          <button type="button" onClick={() => handleTableStatusChange(table.id, 'available')} className="rounded-lg bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">Available</button>
-                          <button type="button" onClick={() => handleTableStatusChange(table.id, 'occupied')} className="rounded-lg bg-amber-100 px-2.5 py-1.5 text-xs font-semibold text-amber-700">Occupied</button>
-                          <button type="button" onClick={() => handleTableStatusChange(table.id, 'reserved')} className="rounded-lg bg-violet-100 px-2.5 py-1.5 text-xs font-semibold text-violet-700">Reserved</button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <h2 className="mb-4 text-lg font-semibold text-slate-800">Quick Status</h2>
+                  <h2 className="mb-4 text-lg font-semibold text-slate-800">Live Floor Stats</h2>
                   <div className="space-y-3 text-sm text-slate-600">
-                    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>Occupied</span><strong className="text-slate-900">{tables.filter((table) => table.status === 'occupied').length}</strong></div>
-                    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>Reserved</span><strong className="text-slate-900">{tables.filter((table) => table.status === 'reserved').length}</strong></div>
-                    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>Available</span><strong className="text-slate-900">{tables.filter((table) => table.status === 'available').length}</strong></div>
+                    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>Total tables</span><strong className="text-slate-900">{tableStats.total}</strong></div>
+                    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>Occupied</span><strong className="text-slate-900">{tableStats.occupied}</strong></div>
+                    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>Reserved</span><strong className="text-slate-900">{tableStats.reserved}</strong></div>
+                    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>Available</span><strong className="text-slate-900">{tableStats.available}</strong></div>
+                  </div>
+
+                  <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="text-xs uppercase tracking-[0.12em] text-slate-500">Selected table</div>
+                    <div className="mt-2 text-lg font-bold text-slate-900">
+                      {tables.find((table) => table.id === selectedTableId)?.name || 'No table selected'}
+                    </div>
+                    <div className="mt-1 text-sm text-slate-600">
+                      {tables.find((table) => table.id === selectedTableId)?.status || 'No status'}
+                    </div>
                   </div>
                 </div>
               </div>
