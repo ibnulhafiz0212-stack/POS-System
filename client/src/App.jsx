@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { QRCodeSVG } from 'qrcode.react';
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5001').replace(/\/+$/, '');
 
@@ -29,10 +28,6 @@ const safeJSON = (key, fallback) => {
   }
 };
 
-const slugify = (value) => String(value || 'item').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'item';
-const buildTableQrValue = (table) => `retrobit://table/${table.id}/${slugify(table.name || 'table')}`;
-const buildProductQrValue = (product) => `retrobit://product/${product.id}/${slugify(product.name || 'product')}`;
-
 function App() {
   const [products, setProducts] = useState(fallbackProducts);
   const [orders, setOrders] = useState(fallbackOrders);
@@ -50,8 +45,6 @@ function App() {
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [draftModalOpen, setDraftModalOpen] = useState(false);
   const [drafts, setDrafts] = useState(() => safeJSON('retrobitDrafts', []));
-  const [qrScanValue, setQrScanValue] = useState('');
-  const [qrCodeModal, setQrCodeModal] = useState(null);
   const [loginForm, setLoginForm] = useState({ email: 'admin@retrobit.com', password: 'admin123' });
   const [productForm, setProductForm] = useState({ id: '', name: '', category: '', price: '', image: '' });
   const [tableFilter, setTableFilter] = useState('all');
@@ -440,57 +433,6 @@ function App() {
   const selectedTable = tables.find((table) => table.id === selectedTableId) || null;
   const selectedTableOrder = tableOrders[selectedTableId] || [];
   const selectedTableSubtotal = selectedTableOrder.reduce((sum, item) => sum + Number(item.price) * Number(item.qty), 0);
-  const qrProducts = useMemo(() => products.map((product) => ({
-    ...product,
-    qrValue: product.qrValue || buildProductQrValue(product),
-  })), [products]);
-  const qrTables = useMemo(() => tables.map((table) => ({
-    ...table,
-    qrValue: table.qrValue || buildTableQrValue(table),
-  })), [tables]);
-
-  const handleQrScan = (value) => {
-    const rawValue = (value || '').trim();
-    if (!rawValue) {
-      alert('Scan or paste a valid table or product QR code first.');
-      return;
-    }
-
-    const tableMatch = rawValue.match(/retrobit:\/\/table\/(\d+)(?:\/|$)/i);
-    if (tableMatch) {
-      const tableId = Number(tableMatch[1]);
-      const targetTable = tables.find((table) => table.id === tableId) || tables[0];
-      if (!targetTable) {
-        alert('The scanned table was not found.');
-        return;
-      }
-      setSelectedTableId(targetTable.id);
-      setView('table');
-      setQrScanValue('');
-      alert(`Table ${targetTable.name} selected from QR.`);
-      return;
-    }
-
-    const productMatch = rawValue.match(/retrobit:\/\/product\/(\d+)(?:\/|$)/i);
-    if (productMatch) {
-      const productId = Number(productMatch[1]);
-      const product = products.find((item) => item.id === productId);
-      if (!product) {
-        alert('The scanned product was not found in inventory.');
-        return;
-      }
-      if (selectedTable) {
-        addToTableOrder(product.id);
-      } else {
-        addToOrder(product.id);
-      }
-      setQrScanValue('');
-      alert(`${product.name} added from QR.`);
-      return;
-    }
-
-    alert('Unsupported QR code. Use a valid RetroBit table or product QR.');
-  };
 
   const handleTableStatusChange = (tableId, nextStatus) => {
     setTables((prev) => prev.map((table) => (
@@ -799,15 +741,6 @@ function App() {
                         onChange={(event) => setProductSearch(event.target.value)}
                       />
                     </div>
-                    <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-2 py-1.5">
-                      <input
-                        value={qrScanValue}
-                        onChange={(event) => setQrScanValue(event.target.value)}
-                        placeholder="Scan QR"
-                        className="w-32 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
-                      />
-                      <button type="button" onClick={() => handleQrScan(qrScanValue)} className="rounded-lg bg-slate-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">Scan</button>
-                    </div>
                     <select className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 outline-none" value={selectedCategory} onChange={(event) => setSelectedCategory(event.target.value)}>
                       {categories.map((category) => (
                         <option key={category} value={category}>{category === 'all' ? 'All Category' : category}</option>
@@ -1037,22 +970,7 @@ function App() {
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                     <div className="mb-3 flex items-center justify-between">
                       <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Table Order</h3>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!selectedTable) {
-                            alert('Please select a table first.');
-                            return;
-                          }
-                          setQrCodeModal({
-                            type: 'table',
-                            table: { ...selectedTable, qrValue: buildTableQrValue(selectedTable) },
-                          });
-                        }}
-                        className="rounded-full bg-slate-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white"
-                      >
-                        Table QR
-                      </button>
+                      <span className="rounded-full bg-slate-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">{selectedTableOrder.length} items</span>
                     </div>
 
                     <div className="space-y-2">
@@ -1296,7 +1214,6 @@ function App() {
                             <td className="px-4 py-3 font-medium text-slate-800">{currency.format(product.price)}</td>
                             <td className="px-4 py-3">
                               <div className="flex gap-2">
-                                <button type="button" onClick={() => setQrCodeModal({ type: 'product', product: { ...product, qrValue: product.qrValue || buildProductQrValue(product) } })} className="rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700">QR</button>
                                 <button type="button" onClick={() => handleEditProduct(product)} className="rounded-lg bg-slate-100 px-2.5 py-1.5 text-xs font-semibold text-slate-700">Edit</button>
                                 <button type="button" onClick={() => handleDeleteProduct(product.id)} className="rounded-lg bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-600">Delete</button>
                               </div>
@@ -1433,34 +1350,6 @@ function App() {
            </div>
          </div>
        </div>
-      )}
-
-      {qrCodeModal && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <div className="text-xs uppercase tracking-[0.14em] text-slate-500">{qrCodeModal.type === 'table' ? 'Table QR' : 'Product QR'}</div>
-                <h2 className="mt-1 text-xl font-bold text-slate-900">{qrCodeModal.type === 'table' ? (qrCodeModal.table?.name || 'Selected table') : (qrCodeModal.product?.name || 'Product')}</h2>
-              </div>
-              <button type="button" onClick={() => setQrCodeModal(null)} className="text-sm font-medium text-slate-500">Close</button>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex justify-center rounded-xl bg-white p-3">
-                <QRCodeSVG value={qrCodeModal.type === 'table' ? (qrCodeModal.table?.qrValue || buildTableQrValue(qrCodeModal.table)) : (qrCodeModal.product?.qrValue || buildProductQrValue(qrCodeModal.product))} size={180} includeMargin />
-              </div>
-              <div className="mt-4 break-all text-center text-xs text-slate-600">
-                {qrCodeModal.type === 'table' ? (qrCodeModal.table?.qrValue || buildTableQrValue(qrCodeModal.table)) : (qrCodeModal.product?.qrValue || buildProductQrValue(qrCodeModal.product))}
-              </div>
-            </div>
-
-            <div className="mt-5 flex gap-3">
-              <button type="button" onClick={() => setQrCodeModal(null)} className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700">Close</button>
-              <button type="button" onClick={() => window.print()} className="flex-1 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white">Print QR</button>
-            </div>
-          </div>
-        </div>
       )}
 
       {loginModalOpen && (
