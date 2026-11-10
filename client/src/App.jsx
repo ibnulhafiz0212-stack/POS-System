@@ -609,49 +609,92 @@ function App() {
             </div>
 
             {view === 'qr-menu' && (
-              <div className="grid gap-5 xl:grid-cols-[1.3fr_0.7fr]">
+              <div className="grid gap-5 xl:grid-cols-[1.45fr_0.75fr]">
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="mb-5 flex items-center justify-between">
+                  <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
                       <h2 className="text-lg font-semibold text-slate-800">QR Menu Orders</h2>
                       <p className="text-sm text-slate-500">Live food requests from the QR menu.</p>
                     </div>
-                    <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">{qrMenuOrders.length} active</span>
+                    <div className="flex flex-wrap gap-2">
+                      <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">{qrMenuOrders.length} active</span>
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">3 tables</span>
+                    </div>
+                  </div>
+
+                  <div className="mb-4 flex flex-wrap gap-2">
+                    {['All', 'New', 'Preparing', 'Ready'].map((filter) => (
+                      <button
+                        key={filter}
+                        type="button"
+                        className={`rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] ${
+                          filter === 'All' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
+                        }`}
+                      >
+                        {filter}
+                      </button>
+                    ))}
                   </div>
 
                   <div className="space-y-3">
-                    {qrMenuOrders.map((order) => (
-                      <div key={order.id} className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 md:flex-row md:items-center md:justify-between">
-                        <div>
-                          <div className="text-base font-semibold text-slate-800">{order.table}</div>
-                          <div className="text-sm text-slate-600">{order.customer}</div>
-                          <div className="mt-1 text-xs text-slate-500">{order.items}</div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="text-right">
-                            <div className="text-sm font-bold text-slate-900">{currency.format(order.total)}</div>
-                            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">{order.status}</div>
+                    {qrMenuOrders.map((order) => {
+                      const statusStyles = {
+                        New: 'bg-amber-100 text-amber-700',
+                        Preparing: 'bg-blue-100 text-blue-700',
+                        Ready: 'bg-emerald-100 text-emerald-700',
+                      };
+
+                      return (
+                        <div key={order.id} className="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-50 to-white p-3 shadow-sm">
+                          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <div className="text-base font-semibold text-slate-800">{order.table}</div>
+                                <span className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${statusStyles[order.status] || 'bg-slate-100 text-slate-700'}`}>
+                                  {order.status}
+                                </span>
+                              </div>
+                              <div className="mt-1 text-sm text-slate-600">{order.customer}</div>
+                              <div className="mt-2 text-xs text-slate-500">{order.items}</div>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              <div className="text-right">
+                                <div className="text-sm font-bold text-slate-900">{currency.format(order.total)}</div>
+                                <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Order</div>
+                              </div>
+                              <button type="button" className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800">Accept</button>
+                            </div>
                           </div>
-                          <button type="button" className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white">Accept</button>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <h2 className="text-lg font-semibold text-slate-800">QR Menu Setup</h2>
-                  <div className="mt-5 rounded-2xl bg-slate-900 p-4 text-white">
-                    <div className="mx-auto grid h-36 w-36 place-items-center rounded-2xl bg-white text-[10px] font-bold text-slate-900 shadow-inner">
-                      QR
+                <div className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-800">QR Menu Setup</h2>
+                    <div className="mt-5 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 text-white shadow-lg">
+                      <div className="mx-auto grid h-36 w-36 place-items-center rounded-2xl bg-white text-[10px] font-bold text-slate-900 shadow-inner">
+                        QR
+                      </div>
+                      <div className="mt-4 text-center text-sm font-medium">Scan menu</div>
                     </div>
-                    <div className="mt-4 text-center text-sm font-medium">Scan menu</div>
                   </div>
 
-                  <div className="mt-5 space-y-3 text-sm text-slate-600">
+                  <div className="space-y-3 text-sm text-slate-600">
                     <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>Live scans</span><strong className="text-slate-900">{qrMenuOrders.length}</strong></div>
                     <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>Orders today</span><strong className="text-slate-900">8</strong></div>
                     <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>Avg. ticket</span><strong className="text-slate-900">{currency.format(26)}</strong></div>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Menu status</div>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-sm font-medium text-slate-700">Ready to serve</span>
+                      <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-700">Online</span>
+                    </div>
                   </div>
                 </div>
               </div>
