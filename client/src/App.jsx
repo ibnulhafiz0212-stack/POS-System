@@ -112,6 +112,12 @@ function App() {
     };
   }, [orders, products]);
 
+  const qrMenuOrders = useMemo(() => [
+    { id: 1, table: 'Table 2', customer: 'Walk-in Guest', items: 'Chicken Burger • Soda', total: 28, status: 'New' },
+    { id: 2, table: 'Table 5', customer: 'Family Table', items: 'Veg Pizza • Fries', total: 36, status: 'Preparing' },
+    { id: 3, table: 'Table 6', customer: 'Group Table', items: 'Mango Shake • Salad', total: 22, status: 'Ready' },
+  ], []);
+
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -521,10 +527,10 @@ function App() {
           </div>
 
           <div className="flex items-center gap-3 px-4 py-4">
-            <div className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-[#d4a788] to-[#6a4a3a] text-sm font-bold text-white">S</div>
+            <div className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-[#d4a788] to-[#6a4a3a] text-sm font-bold text-white">A</div>
             <div>
-              <div className="text-sm font-semibold text-slate-800">Saiful Talukdar</div>
-              <div className="text-xs text-slate-500">Product Designer</div>
+              <div className="text-sm font-semibold text-slate-800">Restaurant Admin</div>
+              <div className="text-xs text-slate-500">Operations</div>
             </div>
           </div>
 
@@ -594,11 +600,62 @@ function App() {
                 >
                   {view === 'table' ? '+ New Table' : '+ New'}
                 </button>
-                <button type="button" className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700">QR Menu Orders</button>
+                <button type="button" onClick={() => setView('qr-menu')} className={`rounded-xl border px-4 py-2 text-sm font-medium transition ${view === 'qr-menu' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white text-slate-700'}`}>
+                  QR Menu Orders
+                </button>
                 <button type="button" onClick={() => setDraftModalOpen(true)} className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700">Draft List</button>
                 <button type="button" onClick={() => setView('table')} className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700">Table Order</button>
               </div>
             </div>
+
+            {view === 'qr-menu' && (
+              <div className="grid gap-5 xl:grid-cols-[1.3fr_0.7fr]">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="mb-5 flex items-center justify-between">
+                    <div>
+                      <h2 className="text-lg font-semibold text-slate-800">QR Menu Orders</h2>
+                      <p className="text-sm text-slate-500">Live food requests from the QR menu.</p>
+                    </div>
+                    <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">{qrMenuOrders.length} active</span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {qrMenuOrders.map((order) => (
+                      <div key={order.id} className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 md:flex-row md:items-center md:justify-between">
+                        <div>
+                          <div className="text-base font-semibold text-slate-800">{order.table}</div>
+                          <div className="text-sm text-slate-600">{order.customer}</div>
+                          <div className="mt-1 text-xs text-slate-500">{order.items}</div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <div className="text-sm font-bold text-slate-900">{currency.format(order.total)}</div>
+                            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">{order.status}</div>
+                          </div>
+                          <button type="button" className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white">Accept</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <h2 className="text-lg font-semibold text-slate-800">QR Menu Setup</h2>
+                  <div className="mt-5 rounded-2xl bg-slate-900 p-4 text-white">
+                    <div className="mx-auto grid h-36 w-36 place-items-center rounded-2xl bg-white text-[10px] font-bold text-slate-900 shadow-inner">
+                      QR
+                    </div>
+                    <div className="mt-4 text-center text-sm font-medium">Scan menu</div>
+                  </div>
+
+                  <div className="mt-5 space-y-3 text-sm text-slate-600">
+                    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>Live scans</span><strong className="text-slate-900">{qrMenuOrders.length}</strong></div>
+                    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>Orders today</span><strong className="text-slate-900">8</strong></div>
+                    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>Avg. ticket</span><strong className="text-slate-900">{currency.format(26)}</strong></div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {view === 'dashboard' && (
               <div className="space-y-6">
