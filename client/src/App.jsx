@@ -8,6 +8,12 @@ const generateProductQrValue = (name, id) => {
   return `retrobit://product/${id || Date.now()}/${safeSlug}`;
 };
 
+const generateTableQrValue = (table) => {
+  const label = typeof table?.name === 'string' ? table.name : 'table';
+  const safeSlug = String(label).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'table';
+  return `retrobit://table/${table?.id ?? Date.now()}/${safeSlug}`;
+};
+
 const fallbackProducts = [];
 
 const fallbackOrders = [
@@ -120,6 +126,7 @@ function App() {
   const [qrScanModalOpen, setQrScanModalOpen] = useState(false);
   const [qrScanValue, setQrScanValue] = useState('');
   const [qrPrintModalOpen, setQrPrintModalOpen] = useState(false);
+  const [tableQrModalOpen, setTableQrModalOpen] = useState(false);
 
   const filteredQrMenuOrders = useMemo(() => {
     if (qrMenuFilter === 'All') return qrMenuOrders;
@@ -277,14 +284,28 @@ function App() {
   const handleQrScan = () => {
     const normalized = qrScanValue.trim();
     if (!normalized) {
-      alert('Please scan or enter a product QR code value first.');
+      alert('Please scan or enter a QR code value first.');
+      return;
+    }
+
+    const scannedTable = tables.find((table) => {
+      const value = generateTableQrValue(table);
+      return value === normalized || value.includes(normalized) || normalized.includes(`/table/${table.id}/`);
+    });
+
+    if (scannedTable) {
+      setSelectedTableId(scannedTable.id);
+      setView('table');
+      setQrScanModalOpen(false);
+      setQrScanValue('');
+      alert(`${scannedTable.name} selected. The table order is ready to receive guest orders.`);
       return;
     }
 
     const scannedProduct = products.find((product) => product.qrValue === normalized || product.qrValue?.includes(normalized));
 
     if (!scannedProduct) {
-      alert('QR code not found. Please use a valid product QR code from the inventory list.');
+      alert('QR code not found. Please use a valid product or table QR code.');
       return;
     }
 
@@ -1200,10 +1221,11 @@ function App() {
 
                           <div className="mt-3 text-xs text-slate-500">{table.notes}</div>
 
-                          <div className="mt-4 flex flex-wrap gap-2">
+                              <div className="mt-4 flex flex-wrap gap-2">
                             <button type="button" onClick={() => handleTableStatusChange(table.id, 'available')} className="rounded-lg bg-white px-2.5 py-1.5 text-[10px] font-semibold text-slate-700 shadow-sm">Available</button>
                             <button type="button" onClick={() => handleTableStatusChange(table.id, 'occupied')} className="rounded-lg bg-amber-100 px-2.5 py-1.5 text-[10px] font-semibold text-amber-700">Occupied</button>
                             <button type="button" onClick={() => handleTableStatusChange(table.id, 'reserved')} className="rounded-lg bg-violet-100 px-2.5 py-1.5 text-[10px] font-semibold text-violet-700">Reserved</button>
+                            <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedTableId(table.id); setTableQrModalOpen(true); }} className="rounded-lg bg-slate-900 px-2.5 py-1.5 text-[10px] font-semibold text-white">Table QR</button>
                             <button type="button" onClick={(event) => { event.stopPropagation(); handleDeleteTable(table.id); }} className="rounded-lg bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold text-red-600">Remove</button>
                           </div>
                         </div>
@@ -1285,6 +1307,35 @@ function App() {
                   </div>
                 </div>
               </div>
+            )}
+
+            {tableQrModalOpen && selectedTable && (
+             <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+               <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
+                 <div className="mb-4 flex items-center justify-between">
+                   <h2 className="text-lg font-semibold text-slate-800">{selectedTable.name} QR Code</h2>
+                   <button type="button" onClick={() => setTableQrModalOpen(false)} className="text-sm font-medium text-slate-500">Close</button>
+                 </div>
+
+                 <div className="rounded-2xl bg-slate-50 p-4 text-center">
+                   <div className="mb-4 flex justify-center rounded-2xl bg-white p-3 shadow-inner ring-1 ring-slate-200">
+                     <QRCodeSVG value={generateTableQrValue(selectedTable)} size={160} bgColor="#ffffff" fgColor="#111827" />
+                   </div>
+                   <div className="text-xs uppercase tracking-[0.12em] text-slate-500">Table QR</div>
+                   <div className="mt-2 text-sm font-semibold text-slate-800">{selectedTable.name}</div>
+                   <div className="mt-1 break-all text-[11px] text-slate-500">{generateTableQrValue(selectedTable)}</div>
+                 </div>
+
+                 <div className="mt-5 flex gap-3">
+                   <button type="button" onClick={() => setTableQrModalOpen(false)} className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700">Close</button>
+                   <button type="button" onClick={() => {
+                     setTableQrModalOpen(false);
+                     setView('table');
+                     window.print();
+                   }} className="flex-1 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white">Print QR</button>
+                 </div>
+               </div>
+             </div>
             )}
 
             {newTableModalOpen && (
