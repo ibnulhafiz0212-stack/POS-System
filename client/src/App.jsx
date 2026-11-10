@@ -112,11 +112,56 @@ function App() {
     };
   }, [orders, products]);
 
-  const qrMenuOrders = useMemo(() => [
+  const [qrMenuOrders, setQrMenuOrders] = useState([
     { id: 1, table: 'Table 2', customer: 'Walk-in Guest', items: 'Chicken Burger • Soda', total: 28, status: 'New' },
     { id: 2, table: 'Table 5', customer: 'Family Table', items: 'Veg Pizza • Fries', total: 36, status: 'Preparing' },
     { id: 3, table: 'Table 6', customer: 'Group Table', items: 'Mango Shake • Salad', total: 22, status: 'Ready' },
-  ], []);
+  ]);
+  const [qrMenuFilter, setQrMenuFilter] = useState('All');
+  const [qrOrderForm, setQrOrderForm] = useState({ table: 'Table 2', customer: '', items: '', total: '18' });
+  const [showQrForm, setShowQrForm] = useState(false);
+
+  const filteredQrMenuOrders = useMemo(() => {
+    if (qrMenuFilter === 'All') return qrMenuOrders;
+    return qrMenuOrders.filter((order) => order.status === qrMenuFilter);
+  }, [qrMenuFilter, qrMenuOrders]);
+
+  const qrStats = useMemo(() => ({
+    total: qrMenuOrders.length,
+    newOrders: qrMenuOrders.filter((order) => order.status === 'New').length,
+    preparing: qrMenuOrders.filter((order) => order.status === 'Preparing').length,
+    ready: qrMenuOrders.filter((order) => order.status === 'Ready').length,
+  }), [qrMenuOrders]);
+
+  const advanceQrOrderStatus = (orderId) => {
+    setQrMenuOrders((prev) => prev.map((order) => {
+      if (order.id !== orderId) return order;
+      if (order.status === 'New') return { ...order, status: 'Preparing' };
+      if (order.status === 'Preparing') return { ...order, status: 'Ready' };
+      return { ...order, status: 'Completed' };
+    }));
+  };
+
+  const handleQrOrderSubmit = (event) => {
+    event.preventDefault();
+    const customer = qrOrderForm.customer.trim() || 'New Customer';
+    const items = qrOrderForm.items.trim() || 'Chef Special';
+    const total = Number(qrOrderForm.total) || 0;
+
+    const nextOrder = {
+      id: Date.now(),
+      table: qrOrderForm.table,
+      customer,
+      items,
+      total,
+      status: 'New',
+    };
+
+    setQrMenuOrders((prev) => [nextOrder, ...prev]);
+    setQrOrderForm({ table: 'Table 2', customer: '', items: '', total: '18' });
+    setShowQrForm(false);
+    setQrMenuFilter('All');
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -506,6 +551,7 @@ function App() {
   const navItems = [
     { key: 'dashboard', label: 'Dashboard', icon: '⌂' },
     { key: 'pos', label: 'POS', icon: '◫' },
+    { key: 'qr-menu', label: 'QR Menu', icon: '◌' },
     { key: 'table', label: 'Table', icon: '▣' },
     { key: 'reservations', label: 'Reservations', icon: '✦' },
     { key: 'admin', label: 'Admin', icon: '⚙' },
@@ -577,12 +623,12 @@ function App() {
             <div className="flex flex-col gap-4 rounded-2xl bg-white/50 px-4 py-4 shadow-sm ring-1 ring-slate-200/80 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <h1 className="text-2xl font-bold tracking-[-0.04em] text-slate-900 lg:text-[2rem]">
-                  {view === 'dashboard' ? 'Dashboard Overview' : view === 'admin' ? 'Admin Panel' : view === 'reports' ? 'Reports' : view === 'settings' ? 'Settings' : view === 'table' ? 'Table Management' : view === 'reservations' ? 'Reservations' : 'Point of Sale (POS)'}
+                  {view === 'dashboard' ? 'Dashboard Overview' : view === 'admin' ? 'Admin Panel' : view === 'reports' ? 'Reports' : view === 'settings' ? 'Settings' : view === 'table' ? 'Table Management' : view === 'reservations' ? 'Reservations' : view === 'qr-menu' ? 'QR Menu Orders' : 'Point of Sale (POS)'}
                 </h1>
                 <div className="mt-1 flex items-center gap-2 text-sm text-slate-500">
                   <span>Dashboard</span>
                   <span>•</span>
-                  <span className="font-medium text-slate-700">{view === 'dashboard' ? 'Dashboard' : view === 'admin' ? 'Admin' : view === 'reports' ? 'Reports' : view === 'settings' ? 'Settings' : view === 'table' ? 'Table' : view === 'reservations' ? 'Reservations' : 'POS'}</span>
+                  <span className="font-medium text-slate-700">{view === 'dashboard' ? 'Dashboard' : view === 'admin' ? 'Admin' : view === 'reports' ? 'Reports' : view === 'settings' ? 'Settings' : view === 'table' ? 'Table' : view === 'reservations' ? 'Reservations' : view === 'qr-menu' ? 'QR Menu' : 'POS'}</span>
                 </div>
               </div>
 
@@ -603,6 +649,7 @@ function App() {
                 <button type="button" onClick={() => setView('qr-menu')} className={`rounded-xl border px-4 py-2 text-sm font-medium transition ${view === 'qr-menu' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white text-slate-700'}`}>
                   QR Menu Orders
                 </button>
+                <button type="button" onClick={() => setShowQrForm(true)} className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700">+ Add QR Order</button>
                 <button type="button" onClick={() => setDraftModalOpen(true)} className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700">Draft List</button>
                 <button type="button" onClick={() => setView('table')} className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700">Table Order</button>
               </div>
@@ -617,18 +664,19 @@ function App() {
                       <p className="text-sm text-slate-500">Live food requests from the QR menu.</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">{qrMenuOrders.length} active</span>
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">3 tables</span>
+                      <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">{qrStats.total} active</span>
+                      <button type="button" onClick={() => setShowQrForm(true)} className="rounded-full bg-slate-900 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white">Add order</button>
                     </div>
                   </div>
 
                   <div className="mb-4 flex flex-wrap gap-2">
-                    {['All', 'New', 'Preparing', 'Ready'].map((filter) => (
+                    {['All', 'New', 'Preparing', 'Ready', 'Completed'].map((filter) => (
                       <button
                         key={filter}
                         type="button"
+                        onClick={() => setQrMenuFilter(filter)}
                         className={`rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] ${
-                          filter === 'All' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
+                          qrMenuFilter === filter ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
                         }`}
                       >
                         {filter}
@@ -637,11 +685,14 @@ function App() {
                   </div>
 
                   <div className="space-y-3">
-                    {qrMenuOrders.map((order) => {
+                    {filteredQrMenuOrders.length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">No QR orders in this status</div>
+                    ) : filteredQrMenuOrders.map((order) => {
                       const statusStyles = {
                         New: 'bg-amber-100 text-amber-700',
                         Preparing: 'bg-blue-100 text-blue-700',
                         Ready: 'bg-emerald-100 text-emerald-700',
+                        Completed: 'bg-slate-200 text-slate-700',
                       };
 
                       return (
@@ -663,7 +714,9 @@ function App() {
                                 <div className="text-sm font-bold text-slate-900">{currency.format(order.total)}</div>
                                 <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Order</div>
                               </div>
-                              <button type="button" className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800">Accept</button>
+                              <button type="button" onClick={() => advanceQrOrderStatus(order.id)} className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800">
+                                {order.status === 'New' ? 'Accept' : order.status === 'Preparing' ? 'Mark Ready' : order.status === 'Ready' ? 'Complete' : 'Done'}
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -684,9 +737,10 @@ function App() {
                   </div>
 
                   <div className="space-y-3 text-sm text-slate-600">
-                    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>Live scans</span><strong className="text-slate-900">{qrMenuOrders.length}</strong></div>
-                    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>Orders today</span><strong className="text-slate-900">8</strong></div>
-                    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>Avg. ticket</span><strong className="text-slate-900">{currency.format(26)}</strong></div>
+                    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>Live scans</span><strong className="text-slate-900">{qrStats.total}</strong></div>
+                    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>New</span><strong className="text-slate-900">{qrStats.newOrders}</strong></div>
+                    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>Preparing</span><strong className="text-slate-900">{qrStats.preparing}</strong></div>
+                    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>Ready</span><strong className="text-slate-900">{qrStats.ready}</strong></div>
                   </div>
 
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
@@ -696,6 +750,49 @@ function App() {
                       <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-700">Online</span>
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {showQrForm && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+                <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-slate-800">Add QR Menu Order</h2>
+                    <button type="button" onClick={() => setShowQrForm(false)} className="text-sm font-medium text-slate-500">Close</button>
+                  </div>
+
+                  <form className="space-y-4" onSubmit={handleQrOrderSubmit}>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <label className="block text-sm font-medium text-slate-700">
+                        Table
+                        <select value={qrOrderForm.table} onChange={(event) => setQrOrderForm((prev) => ({ ...prev, table: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-800 outline-none">
+                          {tables.map((table) => (
+                            <option key={table.id} value={table.name}>{table.name}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="block text-sm font-medium text-slate-700">
+                        Amount
+                        <input type="number" min="0" step="0.01" value={qrOrderForm.total} onChange={(event) => setQrOrderForm((prev) => ({ ...prev, total: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-800 outline-none" required />
+                      </label>
+                    </div>
+
+                    <label className="block text-sm font-medium text-slate-700">
+                      Customer
+                      <input value={qrOrderForm.customer} onChange={(event) => setQrOrderForm((prev) => ({ ...prev, customer: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-800 outline-none" placeholder="Walk-in Guest" />
+                    </label>
+
+                    <label className="block text-sm font-medium text-slate-700">
+                      Items
+                      <input value={qrOrderForm.items} onChange={(event) => setQrOrderForm((prev) => ({ ...prev, items: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-800 outline-none" placeholder="Chicken Burger • Soda" required />
+                    </label>
+
+                    <div className="flex gap-3">
+                      <button type="button" onClick={() => setShowQrForm(false)} className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700">Cancel</button>
+                      <button type="submit" className="flex-1 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white">Create Order</button>
+                    </div>
+                  </form>
                 </div>
               </div>
             )}
