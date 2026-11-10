@@ -7,19 +7,30 @@ dotenv.config();
 
 const app = express();
 const PORT = Number(process.env.PORT || 5001);
-const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
-const allowedOrigins = new Set([
+const CLIENT_URL = (process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/+$/, '');
+const fallbackOrigins = [
   CLIENT_URL,
   'http://localhost:5173',
   'http://localhost:5174',
   'http://127.0.0.1:5173',
   'http://127.0.0.1:5174',
-]);
+];
+
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true;
+
+  if (fallbackOrigins.includes(origin)) return true;
+
+  return /^(https?:\/\/)?([a-z0-9-]+\.)*vercel\.app$/.test(origin)
+    || /^(https?:\/\/)?([a-z0-9-]+\.)*netlify\.app$/.test(origin)
+    || /^(https?:\/\/)?localhost(:\d+)?$/.test(origin)
+    || /^(https?:\/\/)?127\.0\.0\.1(:\d+)?$/.test(origin);
+};
 
 app.use((req, res, next) => {
   const origin = req.headers.origin;
 
-  if (origin && allowedOrigins.has(origin)) {
+  if (origin && isAllowedOrigin(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
