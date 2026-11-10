@@ -1,20 +1,26 @@
 import { useEffect, useMemo, useState } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5001').replace(/\/+$/, '');
 
+const generateProductQrValue = (name, id) => {
+  const safeSlug = String(name || 'product').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'product';
+  return `retrobit://product/${id || Date.now()}/${safeSlug}`;
+};
+
 const fallbackProducts = [
-  { id: 1, name: 'Shrimp Basil Salad', price: 10, category: 'Salads', image: 'https://images.unsplash.com/photo-1546793665-c74683f339c1?auto=format&fit=crop&w=500&q=80' },
-  { id: 2, name: 'Onion Rings', price: 10, category: 'Rice', image: 'https://images.unsplash.com/photo-1541592106381-b31e9677c0e5?auto=format&fit=crop&w=500&q=80' },
-  { id: 3, name: 'Smoked Bacon', price: 10, category: 'Rice', image: 'https://images.unsplash.com/photo-1528605248644-14dd04022da1?auto=format&fit=crop&w=500&q=80' },
-  { id: 4, name: 'Fresh Tomatoes', price: 10, category: 'Salads', image: 'https://images.unsplash.com/photo-1546094096-0df4bcaaa337?auto=format&fit=crop&w=500&q=80' },
-  { id: 5, name: 'Chicken Burger', price: 10, category: 'Rice', image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=500&q=80' },
-  { id: 6, name: 'Red Onion Rings', price: 10, category: 'Rice', image: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=500&q=80' },
-  { id: 7, name: 'Beef Burger', price: 10, category: 'Rice', image: 'https://images.unsplash.com/photo-1550317138-10000687a72b?auto=format&fit=crop&w=500&q=80' },
-  { id: 8, name: 'Grilled Burger', price: 10, category: 'Rice', image: 'https://images.unsplash.com/photo-1571091718767-18b5b1457add?auto=format&fit=crop&w=500&q=80' },
-  { id: 9, name: 'Vegetable Pizza', price: 10, category: 'Pizza', image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=500&q=80' },
-  { id: 10, name: 'Fresh Basil Salad', price: 10, category: 'Salads', image: 'https://images.unsplash.com/photo-1546793665-c74683f339c1?auto=format&fit=crop&w=500&q=80' },
-  { id: 11, name: 'Fish & Chips', price: 10, category: 'Rice', image: 'https://images.unsplash.com/photo-1574484284002-1f1234f9d9d8?auto=format&fit=crop&w=500&q=80' },
-  { id: 12, name: 'Berry Smoothie', price: 12, category: 'Beverages', image: 'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=500&q=80' }
+  { id: 1, name: 'Shrimp Basil Salad', price: 10, category: 'Salads', image: 'https://images.unsplash.com/photo-1546793665-c74683f339c1?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Shrimp Basil Salad', 1) },
+  { id: 2, name: 'Onion Rings', price: 10, category: 'Rice', image: 'https://images.unsplash.com/photo-1541592106381-b31e9677c0e5?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Onion Rings', 2) },
+  { id: 3, name: 'Smoked Bacon', price: 10, category: 'Rice', image: 'https://images.unsplash.com/photo-1528605248644-14dd04022da1?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Smoked Bacon', 3) },
+  { id: 4, name: 'Fresh Tomatoes', price: 10, category: 'Salads', image: 'https://images.unsplash.com/photo-1546094096-0df4bcaaa337?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Fresh Tomatoes', 4) },
+  { id: 5, name: 'Chicken Burger', price: 10, category: 'Rice', image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Chicken Burger', 5) },
+  { id: 6, name: 'Red Onion Rings', price: 10, category: 'Rice', image: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Red Onion Rings', 6) },
+  { id: 7, name: 'Beef Burger', price: 10, category: 'Rice', image: 'https://images.unsplash.com/photo-1550317138-10000687a72b?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Beef Burger', 7) },
+  { id: 8, name: 'Grilled Burger', price: 10, category: 'Rice', image: 'https://images.unsplash.com/photo-1571091718767-18b5b1457add?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Grilled Burger', 8) },
+  { id: 9, name: 'Vegetable Pizza', price: 10, category: 'Pizza', image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Vegetable Pizza', 9) },
+  { id: 10, name: 'Fresh Basil Salad', price: 10, category: 'Salads', image: 'https://images.unsplash.com/photo-1546793665-c74683f339c1?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Fresh Basil Salad', 10) },
+  { id: 11, name: 'Fish & Chips', price: 10, category: 'Rice', image: 'https://images.unsplash.com/photo-1574484284002-1f1234f9d9d8?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Fish & Chips', 11) },
+  { id: 12, name: 'Berry Smoothie', price: 12, category: 'Beverages', image: 'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Berry Smoothie', 12) }
 ];
 
 const fallbackOrders = [
@@ -55,7 +61,7 @@ function App() {
   const [draftModalOpen, setDraftModalOpen] = useState(false);
   const [drafts, setDrafts] = useState(() => safeJSON('retrobitDrafts', []));
   const [loginForm, setLoginForm] = useState({ email: 'admin@retrobit.com', password: 'admin123' });
-  const [productForm, setProductForm] = useState({ id: '', name: '', category: '', price: '', image: '' });
+  const [productForm, setProductForm] = useState({ id: '', name: '', category: '', price: '', image: '', qrValue: '' });
   const [tableFilter, setTableFilter] = useState('all');
   const [selectedTableId, setSelectedTableId] = useState(1);
   const [tables, setTables] = useState(() => safeJSON('retrobitTables', [
@@ -268,15 +274,23 @@ function App() {
     setCurrentOrder([]);
   };
 
+  const handleGenerateQr = () => {
+    const nextId = Number(productForm.id || Date.now());
+    const nextQrValue = productForm.qrValue || generateProductQrValue(productForm.name || 'New Product', nextId);
+    setProductForm((prev) => ({ ...prev, qrValue: nextQrValue }));
+  };
+
   const handleProductSubmit = async (event) => {
     event.preventDefault();
 
+    const finalId = Number(productForm.id || Date.now());
     const payload = {
-      id: Number(productForm.id || Date.now()),
+      id: finalId,
       name: productForm.name,
       category: productForm.category,
       price: Number(productForm.price),
       image: productForm.image,
+      qrValue: productForm.qrValue || generateProductQrValue(productForm.name, finalId),
     };
 
     try {
@@ -313,7 +327,7 @@ function App() {
       });
     }
 
-    setProductForm({ id: '', name: '', category: '', price: '', image: '' });
+    setProductForm({ id: '', name: '', category: '', price: '', image: '', qrValue: '' });
   };
 
   const handleEditProduct = (product) => {
@@ -323,6 +337,7 @@ function App() {
       category: product.category,
       price: String(product.price),
       image: product.image || '',
+      qrValue: product.qrValue || generateProductQrValue(product.name, product.id),
     });
   };
 
@@ -1259,9 +1274,29 @@ function App() {
                         placeholder="https://example.com/image.jpg"
                       />
                     </label>
+
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="text-sm font-medium text-slate-700">Product QR</span>
+                        <button type="button" onClick={handleGenerateQr} className="rounded-lg bg-slate-900 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white">Generate</button>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="grid h-24 w-24 place-items-center rounded-xl bg-white p-2 shadow-inner ring-1 ring-slate-200">
+                          {productForm.qrValue ? (
+                            <QRCodeSVG value={productForm.qrValue} size={84} bgColor="#ffffff" fgColor="#111827" />
+                          ) : (
+                            <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">No QR</span>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1 text-xs text-slate-500 break-all">
+                          {productForm.qrValue || 'Generate a QR value for this product.'}
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="flex gap-3">
                       <button type="submit" className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white">Save Product</button>
-                      <button type="button" onClick={() => setProductForm({ id: '', name: '', category: '', price: '', image: '' })} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700">Cancel</button>
+                      <button type="button" onClick={() => setProductForm({ id: '', name: '', category: '', price: '', image: '', qrValue: '' })} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700">Cancel</button>
                     </div>
                   </form>
                 </div>
@@ -1284,7 +1319,20 @@ function App() {
                       <tbody className="divide-y divide-slate-200 bg-white">
                         {products.map((product) => (
                           <tr key={product.id} className="align-middle">
-                            <td className="px-4 py-3 font-medium text-slate-800">{product.name}</td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-3">
+                                <div className="grid h-10 w-10 place-items-center rounded-lg bg-white ring-1 ring-slate-200">
+                                  {product.qrValue ? (
+                                    <QRCodeSVG value={product.qrValue || generateProductQrValue(product.name, product.id)} size={24} bgColor="#ffffff" fgColor="#111827" />
+                                  ) : (
+                                    <span className="text-[8px] font-bold text-slate-500">QR</span>
+                                  )}
+                                </div>
+                                <div>
+                                  <div className="font-medium text-slate-800">{product.name}</div>
+                                </div>
+                              </div>
+                            </td>
                             <td className="px-4 py-3 text-slate-600">{product.category}</td>
                             <td className="px-4 py-3 font-medium text-slate-800">{currency.format(product.price)}</td>
                             <td className="px-4 py-3">
