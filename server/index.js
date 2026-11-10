@@ -52,25 +52,12 @@ const generateProductQrValue = (name, id) => {
   return `retrobit://product/${id || Date.now()}/${safeSlug}`;
 };
 
-const defaultProducts = [
-  { id: 1, name: 'Shrimp Basil Salad', price: 10, category: 'Salads', image: 'https://images.unsplash.com/photo-1546793665-c74683f339c1?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Shrimp Basil Salad', 1) },
-  { id: 2, name: 'Onion Rings', price: 10, category: 'Rice', image: 'https://images.unsplash.com/photo-1541592106381-b31e9677c0e5?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Onion Rings', 2) },
-  { id: 3, name: 'Smoked Bacon', price: 10, category: 'Rice', image: 'https://images.unsplash.com/photo-1528605248644-14dd04022da1?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Smoked Bacon', 3) },
-  { id: 4, name: 'Fresh Tomatoes', price: 10, category: 'Salads', image: 'https://images.unsplash.com/photo-1546094096-0df4bcaaa337?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Fresh Tomatoes', 4) },
-  { id: 5, name: 'Chicken Burger', price: 10, category: 'Rice', image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Chicken Burger', 5) },
-  { id: 6, name: 'Red Onion Rings', price: 10, category: 'Rice', image: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Red Onion Rings', 6) },
-  { id: 7, name: 'Beef Burger', price: 10, category: 'Rice', image: 'https://images.unsplash.com/photo-1550317138-10000687a72b?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Beef Burger', 7) },
-  { id: 8, name: 'Grilled Burger', price: 10, category: 'Rice', image: 'https://images.unsplash.com/photo-1571091718767-18b5b1457add?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Grilled Burger', 8) },
-  { id: 9, name: 'Vegetable Pizza', price: 10, category: 'Pizza', image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Vegetable Pizza', 9) },
-  { id: 10, name: 'Fresh Basil Salad', price: 10, category: 'Salads', image: 'https://images.unsplash.com/photo-1546793665-c74683f339c1?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Fresh Basil Salad', 10) },
-  { id: 11, name: 'Fish & Chips', price: 10, category: 'Rice', image: 'https://images.unsplash.com/photo-1574484284002-1f1234f9d9d8?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Fish & Chips', 11) },
-  { id: 12, name: 'Berry Smoothie', price: 12, category: 'Beverages', image: 'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Berry Smoothie', 12) }
-];
+const defaultProducts = [];
 
 const defaultOrders = [
-  { id: 101, date: '2026-11-10', total: 58, items: [{ name: 'Fresh Basil Salad', qty: 2, price: 10 }, { name: 'Beef Burger', qty: 1, price: 10 }, { name: 'Chicken Burger', qty: 2, price: 10 }] },
-  { id: 102, date: '2026-11-09', total: 46, items: [{ name: 'Onion Rings', qty: 2, price: 10 }, { name: 'Vegetable Pizza', qty: 2, price: 10 }] },
-  { id: 103, date: '2026-11-08', total: 34, items: [{ name: 'Fish & Chips', qty: 2, price: 10 }, { name: 'Fresh Tomatoes', qty: 1, price: 10 }] }
+  { id: 101, date: '2026-11-10', total: 58, items: [{ name: 'Fresh Basil Salad', qty: 2, price: 10 }, { name: 'Beef Burger', qty: 1, price: 10 }, { name: 'Chicken Burger', qty: 2, price: 10 }], customer: 'Nadia', paymentMethod: 'Card' },
+  { id: 102, date: '2026-11-09', total: 46, items: [{ name: 'Onion Rings', qty: 2, price: 10 }, { name: 'Vegetable Pizza', qty: 2, price: 10 }], customer: 'Rafi', paymentMethod: 'Cash' },
+  { id: 103, date: '2026-11-08', total: 34, items: [{ name: 'Fish & Chips', qty: 2, price: 10 }, { name: 'Fresh Tomatoes', qty: 1, price: 10 }], customer: 'Walk-in Guest', paymentMethod: 'Mobile' }
 ];
 
 const defaultSettings = {
@@ -99,6 +86,10 @@ const orderSchema = new mongoose.Schema({
   id: { type: Number, required: true },
   date: { type: String, required: true },
   total: { type: Number, required: true },
+  customer: { type: String, default: 'Walk-in Guest' },
+  paymentMethod: { type: String, default: 'Cash' },
+  tableId: { type: Number, default: null },
+  tableName: { type: String, default: '' },
   items: [{ name: String, qty: Number, price: Number }]
 }, { timestamps: true });
 
@@ -128,7 +119,7 @@ async function connectMongo() {
     console.log('MongoDB connected');
 
     const productCount = await Product.countDocuments();
-    if (productCount === 0) {
+    if (productCount === 0 && defaultProducts.length > 0) {
       await Product.insertMany(defaultProducts);
     }
 
@@ -277,6 +268,10 @@ app.post('/api/orders', async (req, res) => {
       id: Number(payload.id ?? Date.now()),
       date: payload.date || new Date().toISOString().slice(0, 10),
       total: Number(payload.total || 0),
+      customer: payload.customer || 'Walk-in Guest',
+      paymentMethod: payload.paymentMethod || 'Cash',
+      tableId: payload.tableId ?? null,
+      tableName: payload.tableName || '',
       items: Array.isArray(payload.items) ? payload.items : []
     };
 

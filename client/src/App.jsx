@@ -8,20 +8,7 @@ const generateProductQrValue = (name, id) => {
   return `retrobit://product/${id || Date.now()}/${safeSlug}`;
 };
 
-const fallbackProducts = [
-  { id: 1, name: 'Shrimp Basil Salad', price: 10, category: 'Salads', image: 'https://images.unsplash.com/photo-1546793665-c74683f339c1?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Shrimp Basil Salad', 1) },
-  { id: 2, name: 'Onion Rings', price: 10, category: 'Rice', image: 'https://images.unsplash.com/photo-1541592106381-b31e9677c0e5?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Onion Rings', 2) },
-  { id: 3, name: 'Smoked Bacon', price: 10, category: 'Rice', image: 'https://images.unsplash.com/photo-1528605248644-14dd04022da1?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Smoked Bacon', 3) },
-  { id: 4, name: 'Fresh Tomatoes', price: 10, category: 'Salads', image: 'https://images.unsplash.com/photo-1546094096-0df4bcaaa337?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Fresh Tomatoes', 4) },
-  { id: 5, name: 'Chicken Burger', price: 10, category: 'Rice', image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Chicken Burger', 5) },
-  { id: 6, name: 'Red Onion Rings', price: 10, category: 'Rice', image: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Red Onion Rings', 6) },
-  { id: 7, name: 'Beef Burger', price: 10, category: 'Rice', image: 'https://images.unsplash.com/photo-1550317138-10000687a72b?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Beef Burger', 7) },
-  { id: 8, name: 'Grilled Burger', price: 10, category: 'Rice', image: 'https://images.unsplash.com/photo-1571091718767-18b5b1457add?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Grilled Burger', 8) },
-  { id: 9, name: 'Vegetable Pizza', price: 10, category: 'Pizza', image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Vegetable Pizza', 9) },
-  { id: 10, name: 'Fresh Basil Salad', price: 10, category: 'Salads', image: 'https://images.unsplash.com/photo-1546793665-c74683f339c1?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Fresh Basil Salad', 10) },
-  { id: 11, name: 'Fish & Chips', price: 10, category: 'Rice', image: 'https://images.unsplash.com/photo-1574484284002-1f1234f9d9d8?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Fish & Chips', 11) },
-  { id: 12, name: 'Berry Smoothie', price: 12, category: 'Beverages', image: 'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=500&q=80', qrValue: generateProductQrValue('Berry Smoothie', 12) }
-];
+const fallbackProducts = [];
 
 const fallbackOrders = [
   { id: 101, date: '2026-11-10', total: 58, items: [{ name: 'Fresh Basil Salad', qty: 2, price: 10 }, { name: 'Beef Burger', qty: 1, price: 10 }, { name: 'Chicken Burger', qty: 2, price: 10 }] },
@@ -54,6 +41,10 @@ function App() {
   const [currentOrder, setCurrentOrder] = useState(fallbackCurrentOrder);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [productSearch, setProductSearch] = useState('');
+  const [customerName, setCustomerName] = useState('Walk-in Guest');
+  const [paymentMethod, setPaymentMethod] = useState('Cash');
+  const [billModalOpen, setBillModalOpen] = useState(false);
+  const [billPreview, setBillPreview] = useState(null);
   const [view, setView] = useState('pos');
   const [pendingView, setPendingView] = useState('admin');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -298,10 +289,20 @@ function App() {
     }
 
     addToOrder(scannedProduct.id);
+    setQrMenuOrders((prev) => prev.map((order) => {
+      const matchesProduct = order.items.toLowerCase().includes(scannedProduct.name.toLowerCase());
+      const matchesCustomer = order.customer?.toLowerCase() === customerName.toLowerCase();
+      const matchesTable = selectedTable?.name && order.table === selectedTable.name;
+
+      if ((matchesProduct || matchesCustomer || matchesTable) && order.status !== 'Completed') {
+        return { ...order, status: 'Completed' };
+      }
+      return order;
+    }));
     setQrScanModalOpen(false);
     setQrScanValue('');
     setView('pos');
-    alert(`${scannedProduct.name} was confirmed and added to the current order.`);
+    alert(`${scannedProduct.name} was confirmed, added to the current order, and the matching QR order was completed.`);
   };
 
   const handleProductSubmit = async (event) => {
@@ -428,12 +429,38 @@ function App() {
     }
   };
 
+  const buildBillPreview = (items = currentOrder) => {
+    const itemSubtotal = items.reduce((sum, item) => sum + Number(item.price) * Number(item.qty), 0);
+    const tax = itemSubtotal * (Number(settings.taxRate || 0) / 100);
+    const service = itemSubtotal * (Number(settings.serviceCharge || 0) / 100);
+    const total = itemSubtotal + tax + service;
+
+    return {
+      orderNumber: `INV-${Date.now().toString().slice(-6)}`,
+      date: new Date().toLocaleString(),
+      customer: customerName || 'Walk-in Guest',
+      paymentMethod,
+      items,
+      subtotal: itemSubtotal,
+      tax,
+      service,
+      total,
+    };
+  };
+
   const submitOrder = async () => {
+    if (!currentOrder.length) {
+      alert('Please add at least one item before finalizing the bill.');
+      return;
+    }
+
     const orderPayload = {
       id: Date.now(),
       date: new Date().toISOString().slice(0, 10),
       total: grandTotal,
       items: currentOrder,
+      customer: customerName,
+      paymentMethod,
     };
 
     try {
@@ -453,7 +480,11 @@ function App() {
       setOrders((prev) => [orderPayload, ...prev]);
     }
 
+    setBillPreview(buildBillPreview());
+    setBillModalOpen(true);
     setCurrentOrder([]);
+    setCustomerName('Walk-in Guest');
+    setPaymentMethod('Cash');
     alert('Order saved successfully.');
   };
 
@@ -480,6 +511,30 @@ function App() {
   };
 
   const handleTableSelect = (tableId) => setSelectedTableId(tableId);
+
+  const handleDeleteTable = (tableId) => {
+    if (tables.length <= 1) {
+      alert('At least one table must remain in the restaurant floor plan.');
+      return;
+    }
+
+    const targetTable = tables.find((table) => table.id === tableId);
+    setTables((prev) => prev.filter((table) => table.id !== tableId));
+    setTableOrders((prev) => {
+      const next = { ...prev };
+      delete next[tableId];
+      return next;
+    });
+
+    if (selectedTableId === tableId) {
+      const nextTable = tables.find((table) => table.id !== tableId);
+      setSelectedTableId(nextTable ? nextTable.id : 1);
+    }
+
+    if (targetTable) {
+      alert(`${targetTable.name} was removed from the floor plan.`);
+    }
+  };
 
   const handleNewTableSubmit = (event) => {
     event.preventDefault();
@@ -978,20 +1033,26 @@ function App() {
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {filteredProducts.map((product) => (
-                      <article key={product.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm">
-                        <div className="h-36 overflow-hidden bg-slate-200">
-                          <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
-                        </div>
-                        <div className="p-3">
-                          <h3 className="text-base font-semibold text-slate-800">{product.name}</h3>
-                          <div className="mt-3 flex items-center justify-between">
-                            <span className="text-base font-bold text-slate-900">{currency.format(product.price)}</span>
-                            <button type="button" onClick={() => addToOrder(product.id)} className="grid h-9 w-9 place-items-center rounded-xl bg-slate-900 text-lg font-semibold text-white">+</button>
+                    {filteredProducts.length === 0 ? (
+                      <div className="col-span-full rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">
+                        No products available yet. Add a product from the admin panel to start taking orders.
+                      </div>
+                    ) : (
+                      filteredProducts.map((product) => (
+                        <article key={product.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm">
+                          <div className="h-36 overflow-hidden bg-slate-200">
+                            <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
                           </div>
-                        </div>
-                      </article>
-                    ))}
+                          <div className="p-3">
+                            <h3 className="text-base font-semibold text-slate-800">{product.name}</h3>
+                            <div className="mt-3 flex items-center justify-between">
+                              <span className="text-base font-bold text-slate-900">{currency.format(product.price)}</span>
+                              <button type="button" onClick={() => addToOrder(product.id)} className="grid h-9 w-9 place-items-center rounded-xl bg-slate-900 text-lg font-semibold text-white">+</button>
+                            </div>
+                          </div>
+                        </article>
+                      ))
+                    )}
                   </div>
                 </div>
 
@@ -1003,9 +1064,38 @@ function App() {
                     </div>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-3">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      <label className="block text-xs font-medium uppercase tracking-[0.12em] text-slate-500">
+                        Customer
+                        <input
+                          value={customerName}
+                          onChange={(event) => setCustomerName(event.target.value)}
+                          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-slate-800 outline-none"
+                          placeholder="Walk-in Guest"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      <label className="block text-xs font-medium uppercase tracking-[0.12em] text-slate-500">
+                        Payment
+                        <select
+                          value={paymentMethod}
+                          onChange={(event) => setPaymentMethod(event.target.value)}
+                          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-slate-800 outline-none"
+                        >
+                          <option value="Cash">Cash</option>
+                          <option value="Card">Card</option>
+                          <option value="Mobile">Mobile Wallet</option>
+                          <option value="Split">Split Payment</option>
+                        </select>
+                      </label>
+                    </div>
+
                     <div className="flex items-center justify-between rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-600">
-                      <span>Order #<span className="font-bold text-slate-900">20</span></span>
+                      <span>Order #<span className="font-bold text-slate-900">{Date.now().toString().slice(-4)}</span></span>
+                      <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-700">Open</span>
                     </div>
 
                     <div className="space-y-2">
@@ -1041,7 +1131,14 @@ function App() {
                     <button type="button" onClick={() => alert('KOT sent to kitchen.')} className="rounded-xl bg-[#111827] px-3 py-2.5 text-sm font-semibold text-white">KOT & Print</button>
                     <button type="button" onClick={saveDraft} className="rounded-xl bg-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-700">Draft</button>
                     <button type="button" onClick={submitOrder} className="rounded-xl bg-[#f28a2d] px-3 py-2.5 text-sm font-semibold text-white sm:col-span-2">Bill & Payment</button>
-                    <button type="button" className="rounded-xl bg-emerald-500 px-3 py-2.5 text-sm font-semibold text-white sm:col-span-2">Bill & Print</button>
+                    <button type="button" onClick={() => {
+                      if (!currentOrder.length) {
+                        alert('Please add at least one item before opening the bill preview.');
+                        return;
+                      }
+                      setBillPreview(buildBillPreview());
+                      setBillModalOpen(true);
+                    }} className="rounded-xl bg-emerald-500 px-3 py-2.5 text-sm font-semibold text-white sm:col-span-2">Bill & Print</button>
                   </div>
                 </aside>
               </div>
@@ -1107,6 +1204,7 @@ function App() {
                             <button type="button" onClick={() => handleTableStatusChange(table.id, 'available')} className="rounded-lg bg-white px-2.5 py-1.5 text-[10px] font-semibold text-slate-700 shadow-sm">Available</button>
                             <button type="button" onClick={() => handleTableStatusChange(table.id, 'occupied')} className="rounded-lg bg-amber-100 px-2.5 py-1.5 text-[10px] font-semibold text-amber-700">Occupied</button>
                             <button type="button" onClick={() => handleTableStatusChange(table.id, 'reserved')} className="rounded-lg bg-violet-100 px-2.5 py-1.5 text-[10px] font-semibold text-violet-700">Reserved</button>
+                            <button type="button" onClick={(event) => { event.stopPropagation(); handleDeleteTable(table.id); }} className="rounded-lg bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold text-red-600">Remove</button>
                           </div>
                         </div>
                       );
@@ -1506,6 +1604,50 @@ function App() {
           </div>
         </main>
       </div>
+
+      {billModalOpen && billPreview && (
+       <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 p-4">
+         <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
+           <div className="mb-4 flex items-center justify-between">
+             <div>
+               <div className="text-xl font-bold text-slate-900">RetroBit Restaurant</div>
+               <div className="text-xs text-slate-500">{billPreview.date}</div>
+             </div>
+             <button type="button" onClick={() => setBillModalOpen(false)} className="text-sm font-medium text-slate-500">Close</button>
+           </div>
+
+           <div className="mb-4 rounded-2xl bg-slate-50 p-3 text-sm text-slate-700">
+             <div className="flex items-center justify-between"><span>Bill No.</span><strong>{billPreview.orderNumber}</strong></div>
+             <div className="mt-1 flex items-center justify-between"><span>Customer</span><strong>{billPreview.customer}</strong></div>
+             <div className="mt-1 flex items-center justify-between"><span>Payment</span><strong>{billPreview.paymentMethod}</strong></div>
+           </div>
+
+           <div className="space-y-2">
+             {billPreview.items.map((item) => (
+               <div key={`${item.id}-${item.name}`} className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                 <div>
+                   <div className="font-semibold text-slate-800">{item.name}</div>
+                   <div className="text-xs text-slate-500">Qty: {item.qty}</div>
+                 </div>
+                 <div className="font-semibold text-slate-800">{currency.format(Number(item.price) * Number(item.qty))}</div>
+               </div>
+             ))}
+           </div>
+
+           <div className="mt-5 space-y-2 border-t border-slate-200 pt-4 text-sm text-slate-600">
+             <div className="flex items-center justify-between"><span>Subtotal</span><strong className="text-slate-900">{currency.format(billPreview.subtotal)}</strong></div>
+             <div className="flex items-center justify-between"><span>Tax</span><strong className="text-slate-900">{currency.format(billPreview.tax)}</strong></div>
+             <div className="flex items-center justify-between"><span>Service</span><strong className="text-slate-900">{currency.format(billPreview.service)}</strong></div>
+             <div className="flex items-center justify-between border-t border-slate-200 pt-2 text-lg font-bold text-slate-900"><span>Total</span><span>{currency.format(billPreview.total)}</span></div>
+           </div>
+
+           <div className="mt-5 flex gap-3">
+             <button type="button" onClick={() => setBillModalOpen(false)} className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700">Close</button>
+             <button type="button" onClick={() => window.print()} className="flex-1 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white">Print Bill</button>
+           </div>
+         </div>
+       </div>
+      )}
 
       {loginModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
