@@ -70,6 +70,9 @@ function App() {
     { id: 1, guest: 'Nadia', phone: '+8801700000000', date: '2026-11-10', time: '19:30', seats: 4, table: 'Table 3', status: 'Confirmed' },
     { id: 2, guest: 'Rafi', phone: '+8801888888888', date: '2026-11-10', time: '20:00', seats: 2, table: 'Table 1', status: 'Pending' },
   ]));
+  const [tableOrders, setTableOrders] = useState(() => safeJSON('retrobitTableOrders', {}));
+  const [newTableForm, setNewTableForm] = useState({ name: 'Table 7', seats: '4', notes: 'Ready for new guests' });
+  const [newTableModalOpen, setNewTableModalOpen] = useState(false);
   const [reservationForm, setReservationForm] = useState({
     guest: '',
     phone: '',
@@ -170,6 +173,10 @@ function App() {
   useEffect(() => {
     localStorage.setItem('retrobitReservations', JSON.stringify(reservations));
   }, [reservations]);
+
+  useEffect(() => {
+    localStorage.setItem('retrobitTableOrders', JSON.stringify(tableOrders));
+  }, [tableOrders]);
 
   const openProtectedView = (target) => {
     if ((target === 'admin' || target === 'reports' || target === 'settings') && !isLoggedIn) {
@@ -372,6 +379,10 @@ function App() {
     return tables.filter((table) => table.status === tableFilter);
   }, [tableFilter, tables]);
 
+  const selectedTable = tables.find((table) => table.id === selectedTableId) || null;
+  const selectedTableOrder = tableOrders[selectedTableId] || [];
+  const selectedTableSubtotal = selectedTableOrder.reduce((sum, item) => sum + Number(item.price) * Number(item.qty), 0);
+
   const handleTableStatusChange = (tableId, nextStatus) => {
     setTables((prev) => prev.map((table) => (
       table.id === tableId ? { ...table, status: nextStatus } : table
@@ -379,6 +390,84 @@ function App() {
   };
 
   const handleTableSelect = (tableId) => setSelectedTableId(tableId);
+
+  const handleNewTableSubmit = (event) => {
+    event.preventDefault();
+    const cleanName = newTableForm.name.trim();
+    const seats = Number(newTableForm.seats) || 2;
+    const notes = newTableForm.notes.trim() || 'Ready for new guests';
+    if (!cleanName) return;
+
+    const newTable = {
+      id: Date.now(),
+      name: cleanName,
+      status: 'available',
+      seats,
+      notes,
+    };
+
+    setTables((prev) => [...prev, newTable]);
+    setTableOrders((prev) => ({ ...prev, [newTable.id]: [] }));
+    setSelectedTableId(newTable.id);
+    setNewTableForm({ name: `Table ${tables.length + 2}`, seats: '4', notes: 'Ready for new guests' });
+    setNewTableModalOpen(false);
+    setTableFilter('all');
+  };
+
+  const addToTableOrder = (productId) => {
+    const product = products.find((item) => item.id === productId);
+    if (!product) return;
+
+    const targetTableId = selectedTableId;
+    setTableOrders((prev) => {
+      const existing = prev[targetTableId] || [];
+      const item = existing.find((entry) => entry.id === productId);
+      const nextItems = item
+        ? existing.map((entry) => entry.id === productId ? { ...entry, qty: Number(entry.qty) + 1 } : entry)
+        : [...existing, { id: product.id, name: product.name, price: Number(product.price), qty: 1 }];
+
+      return { ...prev, [targetTableId]: nextItems };
+    });
+
+    setTables((prev) => prev.map((table) => (
+      table.id === targetTableId ? { ...table, status: 'occupied' } : table
+    )));
+  };
+
+  const updateTableOrderQuantity = (productId, delta) => {
+    setTableOrders((prev) => {
+      const current = prev[selectedTableId] || [];
+      const nextItems = current
+        .map((item) => (item.id === productId ? { ...item, qty: Number(item.qty) + delta } : item))
+        .filter((item) => Number(item.qty) > 0);
+
+      return { ...prev, [selectedTableId]: nextItems };
+    });
+  };
+
+  const submitTableOrder = () => {
+    const items = tableOrders[selectedTableId] || [];
+    if (!items.length) {
+      alert('Please add at least one item to the selected table before submitting the order.');
+      return;
+    }
+
+    const orderPayload = {
+      id: Date.now(),
+      date: new Date().toISOString().slice(0, 10),
+      total: selectedTableSubtotal,
+      items,
+      tableId: selectedTableId,
+      tableName: selectedTable?.name || 'Table',
+    };
+
+    setOrders((prev) => [orderPayload, ...prev]);
+    setTableOrders((prev) => ({ ...prev, [selectedTableId]: [] }));
+    setTables((prev) => prev.map((table) => (
+      table.id === selectedTableId ? { ...table, status: 'occupied' } : table
+    )));
+    alert(`Order sent for ${selectedTable?.name || 'selected table'}.`);
+  };
 
   const handleReservationSubmit = (event) => {
     event.preventDefault();
@@ -492,7 +581,19 @@ function App() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <button type="button" onClick={resetCurrentOrder} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">+ New</button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (view === 'table') {
+                      setNewTableModalOpen(true);
+                      return;
+                    }
+                    resetCurrentOrder();
+                  }}
+                  className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                >
+                  {view === 'table' ? '+ New Table' : '+ New'}
+                </button>
                 <button type="button" className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700">QR Menu Orders</button>
                 <button type="button" onClick={() => setDraftModalOpen(true)} className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700">Draft List</button>
                 <button type="button" onClick={() => setView('table')} className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700">Table Order</button>
@@ -669,7 +770,8 @@ function App() {
                       <h2 className="text-lg font-semibold text-slate-800">Table Layout</h2>
                       <p className="text-sm text-slate-500">Manage floor activity in real time.</p>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button type="button" onClick={() => setNewTableModalOpen(true)} className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-white">+ New Table</button>
                       {['all', 'available', 'occupied', 'reserved'].map((status) => (
                         <button
                           key={status}
@@ -727,24 +829,112 @@ function App() {
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <h2 className="mb-4 text-lg font-semibold text-slate-800">Live Floor Stats</h2>
-                  <div className="space-y-3 text-sm text-slate-600">
-                    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>Total tables</span><strong className="text-slate-900">{tableStats.total}</strong></div>
-                    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>Occupied</span><strong className="text-slate-900">{tableStats.occupied}</strong></div>
-                    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>Reserved</span><strong className="text-slate-900">{tableStats.reserved}</strong></div>
-                    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>Available</span><strong className="text-slate-900">{tableStats.available}</strong></div>
+                <div className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div>
+                    <h2 className="mb-4 text-lg font-semibold text-slate-800">Live Floor Stats</h2>
+                    <div className="space-y-3 text-sm text-slate-600">
+                      <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>Total tables</span><strong className="text-slate-900">{tableStats.total}</strong></div>
+                      <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>Occupied</span><strong className="text-slate-900">{tableStats.occupied}</strong></div>
+                      <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>Reserved</span><strong className="text-slate-900">{tableStats.reserved}</strong></div>
+                      <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><span>Available</span><strong className="text-slate-900">{tableStats.available}</strong></div>
+                    </div>
                   </div>
 
-                  <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                     <div className="text-xs uppercase tracking-[0.12em] text-slate-500">Selected table</div>
                     <div className="mt-2 text-lg font-bold text-slate-900">
-                      {tables.find((table) => table.id === selectedTableId)?.name || 'No table selected'}
+                      {selectedTable?.name || 'No table selected'}
                     </div>
                     <div className="mt-1 text-sm text-slate-600">
-                      {tables.find((table) => table.id === selectedTableId)?.status || 'No status'}
+                      {selectedTable?.status || 'No status'} • {selectedTable?.seats || 0} seats
                     </div>
                   </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="mb-3 flex items-center justify-between">
+                      <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Table Order</h3>
+                      <span className="rounded-full bg-slate-900 px-2 py-1 text-[10px] font-semibold text-white">{selectedTableOrder.length} items</span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {selectedTableOrder.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-slate-300 bg-white px-3 py-6 text-center text-sm text-slate-500">No items added yet</div>
+                      ) : (
+                        selectedTableOrder.map((item) => (
+                          <div key={item.id} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2">
+                            <div>
+                              <div className="text-sm font-semibold text-slate-800">{item.name}</div>
+                              <div className="text-xs text-slate-500">{currency.format(item.price)} each</div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button type="button" onClick={() => updateTableOrderQuantity(item.id, -1)} className="grid h-7 w-7 place-items-center rounded-md bg-slate-200 text-slate-600">-</button>
+                              <span className="min-w-6 text-center text-sm font-semibold text-slate-800">{item.qty}</span>
+                              <button type="button" onClick={() => updateTableOrderQuantity(item.id, 1)} className="grid h-7 w-7 place-items-center rounded-md bg-slate-900 text-white">+</button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    <div className="mt-4 rounded-xl bg-slate-100 p-3 text-sm text-slate-600">
+                      <div className="flex items-center justify-between"><span>Subtotal</span><strong className="text-slate-900">{currency.format(selectedTableSubtotal)}</strong></div>
+                    </div>
+
+                    <div className="mt-4 rounded-xl border border-slate-200 bg-white p-2">
+                      <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Quick add items</div>
+                      <div className="space-y-2">
+                        {products.slice(0, 5).map((product) => (
+                          <div key={product.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-2 py-2">
+                            <div>
+                              <div className="text-xs font-semibold text-slate-800">{product.name}</div>
+                              <div className="text-[10px] text-slate-500">{currency.format(product.price)}</div>
+                            </div>
+                            <button type="button" onClick={() => addToTableOrder(product.id)} className="rounded-lg bg-slate-900 px-2 py-1 text-[10px] font-semibold text-white">Add</button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <button type="button" onClick={() => setTableOrders((prev) => ({ ...prev, [selectedTableId]: [] }))} className="rounded-xl bg-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">Clear</button>
+                      <button type="button" onClick={submitTableOrder} className="rounded-xl bg-[#f28a2d] px-3 py-2 text-xs font-semibold text-white">Send Order</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {newTableModalOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+                <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-slate-800">Add New Table</h2>
+                    <button type="button" onClick={() => setNewTableModalOpen(false)} className="text-sm font-medium text-slate-500">Close</button>
+                  </div>
+                  <form className="space-y-4" onSubmit={handleNewTableSubmit}>
+                    <label className="block text-sm font-medium text-slate-700">
+                      Table Name
+                      <input value={newTableForm.name} onChange={(event) => setNewTableForm((prev) => ({ ...prev, name: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-800 outline-none" required />
+                    </label>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <label className="block text-sm font-medium text-slate-700">
+                        Seats
+                        <input type="number" min="1" value={newTableForm.seats} onChange={(event) => setNewTableForm((prev) => ({ ...prev, seats: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-800 outline-none" required />
+                      </label>
+                      <label className="block text-sm font-medium text-slate-700">
+                        Status
+                        <input value="Available" readOnly className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-800 outline-none" />
+                      </label>
+                    </div>
+                    <label className="block text-sm font-medium text-slate-700">
+                      Notes
+                      <input value={newTableForm.notes} onChange={(event) => setNewTableForm((prev) => ({ ...prev, notes: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-800 outline-none" />
+                    </label>
+                    <div className="flex gap-3">
+                      <button type="button" onClick={() => setNewTableModalOpen(false)} className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700">Cancel</button>
+                      <button type="submit" className="flex-1 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white">Create Table</button>
+                    </div>
+                  </form>
                 </div>
               </div>
             )}
