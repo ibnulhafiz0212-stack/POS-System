@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RetroBit POS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <div class="app-window">
+        <aside class="sidebar">
+          <div class="brand-row">
+            <div class="brand-mark">
+              <span>R</span>
+            </div>
+            <div class="brand-name">RetroBit</div>
+          </div>
+
+          <div class="profile-box">
+            <div class="avatar">S</div>
+            <div class="profile-meta">
+              <strong>Saiful Talukdar</strong>
+              <span>Product Designer</span>
+            </div>
+          </div>
+
+          <nav class="nav-menu">
+            <button class="nav-item" data-view="dashboard">
+              <span class="icon">⌂</span>
+              <span>Dashboard</span>
+            </button>
+            <button class="nav-item selected active" data-view="pos">
+              <span class="icon">◫</span>
+              <span>Pos</span>
+            </button>
+            <button class="nav-item" data-view="admin">
+              <span class="icon">⚙</span>
+              <span>Admin</span>
+            </button>
+            <button class="nav-item" data-view="reports">
+              <span class="icon">◍</span>
+              <span>Reports</span>
+            </button>
+            <button class="nav-item" data-view="settings">
+              <span class="icon">⚙</span>
+              <span>Setting</span>
+            </button>
+            <button class="nav-item">
+              <span class="icon">▣</span>
+              <span>Table</span>
+            </button>
+            <button class="nav-item">
+              <span class="icon">✦</span>
+              <span>Reservations</span>
+            </button>
+            <div class="nav-section">Offering</div>
+            <button class="nav-item">
+              <span class="icon">◨</span>
+              <span>Delivery Executive</span>
+            </button>
+            <button class="nav-item">
+              <span class="icon">◌</span>
+              <span>Payments</span>
+              <span class="badge">New</span>
+            </button>
+            <button class="nav-item">
+              <span class="icon">◎</span>
+              <span>Customer</span>
+            </button>
+            <button class="nav-item">
+              <span class="icon">◍</span>
+              <span>Invoice</span>
+            </button>
+            <div class="nav-section">Back Office</div>
+            <button class="nav-item">
+              <span class="icon">◔</span>
+              <span>User</span>
+            </button>
+          </nav>
+
+          <div class="logout-row login-trigger" id="loginTrigger">
+            <span class="icon">⇠</span>
+            <span id="loginLabel">Login</span>
+          </div>
+        </aside>
+
+        <main class="main-panel">
+          <header class="topbar">
+            <div class="global-search">
+              <span class="search-icon">⌕</span>
+              <input type="text" value="Search (Ctrl+/)" aria-label="Search" />
+            </div>
+            <div class="header-icons">
+              <button class="icon-button" type="button">◐</button>
+              <button class="icon-button" type="button">☼</button>
+              <div class="mini-avatar">S</div>
+            </div>
+          </header>
+
+          <section class="content-panel">
+            <div class="workspace-header" id="workspaceHeader">
+              <div>
+                <h1>Point of Sale (POS)</h1>
+                <div class="breadcrumbs">
+                  <span>Dashboard</span>
+                  <span class="sep">•</span>
+                  <span class="active">Pos</span>
+                </div>
+              </div>
+
+              <div class="header-actions">
+                <button class="primary-btn" type="button">+ New</button>
+                <button class="secondary-btn" type="button">QR Menu Orders</button>
+                <button class="secondary-btn" type="button">Draft List</button>
+                <button class="secondary-btn" type="button">Table Order</button>
+              </div>
+            </div>
+
+            <div id="dashboardView" class="view-panel">
+              <div class="stats-grid">
+                <div class="stat-card accent">
+                  <div class="stat-label">Total Revenue</div>
+                  <div class="stat-value" id="dashboardRevenue">$0</div>
+                  <div class="stat-trend up">+12.4% vs last week</div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-label">Total Orders</div>
+                  <div class="stat-value" id="dashboardOrders">0</div>
+                  <div class="stat-trend up">+8.1% this week</div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-label">Average Ticket</div>
+                  <div class="stat-value" id="dashboardAverage">$0</div>
+                  <div class="stat-trend down">-2.3% from yesterday</div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-label">Product Count</div>
+                  <div class="stat-value" id="dashboardProducts">0</div>
+                  <div class="stat-trend up">+3 new items</div>
+                </div>
+              </div>
+
+              <div class="dashboard-grid">
+                <div class="panel-card chart-card">
+                  <div class="panel-head">
+                    <h3>Sales Overview</h3>
+                    <button class="mini-button" type="button">This Week</button>
+                  </div>
+                  <div class="bars" id="salesBars"></div>
+                </div>
+
+                <div class="panel-card">
+                  <div class="panel-head">
+                    <h3>Recent Orders</h3>
+                    <button class="mini-button" type="button">View All</button>
+                  </div>
+                  <div class="order-list" id="recentOrdersList"></div>
+                </div>
+              </div>
+            </div>
+
+            <div id="posView" class="view-panel active">
+              <div class="pos-layout">
+                <div class="menu-col">
+                  <div class="toolbar-row">
+                    <div class="search-box menu-search">
+                      <span class="search-icon">⌕</span>
+                      <input id="productSearch" type="text" placeholder="Search in products" />
+                    </div>
+                    <select id="categoryFilter" aria-label="category filter">
+                      <option value="all">All Category</option>
+                    </select>
+                    <select aria-label="brand filter">
+                      <option>Select Brand</option>
+                    </select>
+                  </div>
+
+                  <div class="category-nav" id="categoryNav"></div>
+                  <div class="product-grid" id="productGrid"></div>
+                </div>
+
+                <aside class="ticket-panel">
+                  <div class="ticket-header">
+                    <div class="search-box small">
+                      <span class="search-icon">⌕</span>
+                      <input type="text" placeholder="Search in Existing" />
+                    </div>
+                    <div class="ticket-selects">
+                      <select>
+                        <option>Select Dining</option>
+                      </select>
+                      <select>
+                        <option>Select Table</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="order-box">
+                    <div class="order-title">Order #<span id="orderNumber">20</span></div>
+                    <div id="orderItems"></div>
+
+                    <div class="totals">
+                      <div class="line"><span>Sub total :</span><strong id="subTotal">$0</strong></div>
+                      <div class="line"><span>Product Discount :</span><strong id="productDiscount">$0</strong></div>
+                      <div class="line"><span>Extra Discount :</span><strong id="extraDiscount">$0</strong></div>
+                      <div class="line"><span>Coupon discount :</span><strong id="couponDiscount">$0</strong></div>
+                      <div class="line total"><span>Total :</span><strong id="grandTotal">$0</strong></div>
+                    </div>
+                  </div>
+
+                  <div class="order-actions">
+                    <button class="dark-btn" type="button" id="kotPrintBtn">KOT &amp; Print</button>
+                    <button class="light-btn" type="button" id="draftBtn">Draft</button>
+                    <button class="orange-btn" type="button" id="billPaymentBtn">Bill &amp; Payment</button>
+                    <button class="green-btn" type="button" id="billPrintBtn">Bill &amp; Print</button>
+                  </div>
+                </aside>
+              </div>
+            </div>
+
+            <div id="adminView" class="view-panel">
+              <div class="admin-grid">
+                <div class="panel-card">
+                  <div class="panel-head">
+                    <h3>Add / Edit Product</h3>
+                  </div>
+                  <form id="productForm" class="product-form">
+                    <input type="hidden" id="productId" />
+                    <label>
+                      Product Name
+                      <input id="productName" type="text" placeholder="Enter product name" required />
+                    </label>
+                    <label>
+                      Category
+                      <select id="productCategory" required>
+                        <option value="">Select Category</option>
+                        <option value="Rice">Rice</option>
+                        <option value="Beverages">Beverages</option>
+                        <option value="Salads">Salads</option>
+                        <option value="Soup">Soup</option>
+                        <option value="Pizza">Pizza</option>
+                      </select>
+                    </label>
+                    <label>
+                      Price
+                      <input id="productPrice" type="number" min="0" step="0.01" placeholder="0.00" required />
+                    </label>
+                    <label>
+                      Image URL
+                      <input id="productImage" type="url" placeholder="https://example.com/image.jpg" />
+                    </label>
+                    <div class="form-actions">
+                      <button class="primary-btn" type="submit">Save Product</button>
+                      <button class="secondary-btn" type="button" id="cancelEditBtn">Cancel</button>
+                    </div>
+                  </form>
+                </div>
+
+                <div class="panel-card">
+                  <div class="panel-head">
+                    <h3>Inventory</h3>
+                    <button class="mini-button" type="button" id="refreshProductsBtn">Refresh</button>
+                  </div>
+                  <div class="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Name</th>
+                          <th>Category</th>
+                          <th>Price</th>
+                          <th>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody id="adminProductTable"></tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div class="panel-card wide-panel">
+                  <div class="panel-head">
+                    <h3>Recent Sales</h3>
+                  </div>
+                  <div class="sales-list" id="adminSalesList"></div>
+                </div>
+              </div>
+            </div>
+
+            <div id="reportsView" class="view-panel">
+              <div class="reports-grid">
+                <div class="panel-card">
+                  <div class="panel-head">
+                    <h3>Sales Report</h3>
+                    <button class="mini-button" type="button">Export</button>
+                  </div>
+                  <div class="report-metrics">
+                    <div class="metric-box">
+                      <span>Total Sales</span>
+                      <strong id="reportSalesTotal">$0.00</strong>
+                    </div>
+                    <div class="metric-box">
+                      <span>Orders</span>
+                      <strong id="reportOrdersCount">0</strong>
+                    </div>
+                    <div class="metric-box">
+                      <span>Best Seller</span>
+                      <strong id="reportBestSeller">-</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="panel-card">
+                  <div class="panel-head">
+                    <h3>Top Products</h3>
+                  </div>
+                  <div class="top-products" id="topProductsList"></div>
+                </div>
+              </div>
+            </div>
+
+            <div id="settingsView" class="view-panel">
+              <div class="settings-grid">
+                <div class="panel-card">
+                  <div class="panel-head">
+                    <h3>Store Settings</h3>
+                  </div>
+                  <form id="settingsForm" class="settings-form">
+                    <label>
+                      Tax rate (%)
+                      <input id="taxRateInput" type="number" min="0" step="0.1" value="0" />
+                    </label>
+                    <label>
+                      Service charge (%)
+                      <input id="serviceChargeInput" type="number" min="0" step="0.1" value="0" />
+                    </label>
+                    <label class="check-row">
+                      <input id="autoPrintToggle" type="checkbox" checked />
+                      <span>Auto print receipt</span>
+                    </label>
+                    <label class="check-row">
+                      <input id="lowStockToggle" type="checkbox" checked />
+                      <span>Low stock alert</span>
+                    </label>
+                    <button class="primary-btn" type="submit">Save Settings</button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <div id="loginModal" class="modal hidden" aria-hidden="true">
+      <div class="modal-content">
+        <div class="modal-head">
+          <h3>Admin Login</h3>
+          <button type="button" class="close-btn" id="closeLoginModal">×</button>
+        </div>
+        <form id="loginForm" class="login-form">
+          <label>
+            Email
+            <input id="loginEmail" type="email" value="admin@retrobit.com" required />
+          </label>
+          <label>
+            Password
+            <input id="loginPassword" type="password" value="admin123" required />
+          </label>
+          <button class="primary-btn" type="submit">Login</button>
+        </form>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
