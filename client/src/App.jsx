@@ -11,11 +11,6 @@ const fallbackOrders = [
 ];
 
 const defaultSettings = { taxRate: 0, serviceCharge: 0, autoPrint: true, lowStockAlert: true };
-const fallbackCurrentOrder = [
-  { id: 1, name: 'Fresh Basil Salad', price: 10, qty: 2 },
-  { id: 7, name: 'Beef Burger', price: 10, qty: 1 },
-  { id: 5, name: 'Chicken Burger', price: 10, qty: 2 }
-];
 
 const currency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
@@ -29,12 +24,14 @@ const safeJSON = (key, fallback) => {
 };
 
 function App() {
-  const [products, setProducts] = useState(fallbackProducts);
-  const [orders, setOrders] = useState(fallbackOrders);
-  const [settings, setSettings] = useState(defaultSettings);
-  const [currentOrder, setCurrentOrder] = useState(fallbackCurrentOrder);
+  const [products, setProducts] = useState(() => safeJSON('retrobitProducts', fallbackProducts));
+  const [orders, setOrders] = useState(() => safeJSON('retrobitOrders', fallbackOrders));
+  const [settings, setSettings] = useState(() => safeJSON('retrobitSettings', defaultSettings));
+  const [currentOrder, setCurrentOrder] = useState(() => safeJSON('retrobitCurrentOrder', []));
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [productSearch, setProductSearch] = useState('');
+  const [orderSearch, setOrderSearch] = useState('');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [customerName, setCustomerName] = useState('Walk-in Guest');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [billModalOpen, setBillModalOpen] = useState(false);
@@ -84,6 +81,11 @@ function App() {
     });
   }, [products, productSearch, selectedCategory]);
 
+  const filteredCurrentOrder = useMemo(() => {
+    const term = orderSearch.trim().toLowerCase();
+    return currentOrder.filter((item) => !term || item.name.toLowerCase().includes(term));
+  }, [currentOrder, orderSearch]);
+
   const subtotal = currentOrder.reduce((sum, item) => sum + Number(item.price) * Number(item.qty), 0);
   const productDiscount = 0;
   const extraDiscount = 0;
@@ -131,7 +133,7 @@ function App() {
         setProducts(safeJSON('retrobitProducts', fallbackProducts));
         setOrders(safeJSON('retrobitOrders', fallbackOrders));
         setSettings(safeJSON('retrobitSettings', defaultSettings));
-        setCurrentOrder(safeJSON('retrobitCurrentOrder', fallbackCurrentOrder));
+        setCurrentOrder(safeJSON('retrobitCurrentOrder', []));
       }
     };
 
@@ -582,6 +584,23 @@ function App() {
     { key: 'settings', label: 'Settings', icon: '⚙' },
   ];
 
+  const renderNavItems = (isMobile = false) => navItems.map(({ key, label, icon }) => (
+    <button
+      key={key}
+      type="button"
+      onClick={() => {
+        openProtectedView(key);
+        if (isMobile) setMobileNavOpen(false);
+      }}
+      className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[15px] transition ${
+        view === key ? 'bg-slate-200 font-semibold text-slate-900 shadow-inner' : 'text-slate-700 hover:bg-slate-100'
+      }`}
+    >
+      <span className="w-5 text-center text-base">{icon}</span>
+      <span>{label}</span>
+    </button>
+  ));
+
   const salesBars = [38, 50, 60, 72, 55, 80, 68];
 
   return (
@@ -603,21 +622,7 @@ function App() {
             </div>
           </div>
 
-          <nav className="flex-1 space-y-1 px-2">
-            {navItems.map(({ key, label, icon }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => openProtectedView(key)}
-                className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[15px] transition ${
-                  view === key ? 'bg-slate-200 font-semibold text-slate-900 shadow-inner' : 'text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                <span className="w-5 text-center text-base">{icon}</span>
-                <span>{label}</span>
-              </button>
-            ))}
-          </nav>
+          <nav className="flex-1 space-y-1 px-2">{renderNavItems(false)}</nav>
 
           <button
             type="button"
@@ -630,10 +635,43 @@ function App() {
         </aside>
 
         <main className="flex-1 bg-[#f3f3f3]">
+          {mobileNavOpen && (
+            <div className="fixed inset-0 z-40 bg-slate-900/30 lg:hidden" onClick={() => setMobileNavOpen(false)} />
+          )}
+          {mobileNavOpen && (
+            <aside className="fixed inset-y-0 left-0 z-50 w-[260px] border-r border-[#d7d3d1] bg-[#f4f3f2] p-3 lg:hidden">
+              <div className="mb-4 flex items-center justify-between rounded-xl bg-white/70 px-3 py-2">
+                <div className="flex items-center gap-3">
+                  <div className="grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br from-[#f7a62b] via-[#e76f35] to-[#cc5b2d] text-lg font-extrabold text-white rotate-45">
+                    <span className="-rotate-45">R</span>
+                  </div>
+                  <div className="text-[20px] font-bold tracking-[-0.04em] text-slate-800">RetroBit</div>
+                </div>
+                <button type="button" onClick={() => setMobileNavOpen(false)} className="text-lg text-slate-600">✕</button>
+              </div>
+              <nav className="space-y-1">{renderNavItems(true)}</nav>
+            </aside>
+          )}
+
           <header className="flex items-center justify-between border-b border-[#d7d3d1] bg-[#f9f9f9]/80 px-4 py-3 lg:px-6">
-            <div className="flex items-center gap-3 rounded-xl border border-[#d7d3d1] bg-white/20 px-3 py-2 text-slate-500 shadow-sm lg:w-[420px]">
-              <span className="text-lg">⌕</span>
-              <input className="w-full bg-transparent text-sm text-slate-700 outline-none" value="Search (Ctrl+/)" readOnly />
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setMobileNavOpen((prev) => !prev)}
+                className="grid h-10 w-10 place-items-center rounded-xl border border-[#d7d3d1] bg-white/60 text-lg text-slate-700 lg:hidden"
+                aria-label="Toggle navigation"
+              >
+                ☰
+              </button>
+              <div className="flex items-center gap-3 rounded-xl border border-[#d7d3d1] bg-white/20 px-3 py-2 text-slate-500 shadow-sm lg:w-[420px]">
+                <span className="text-lg">⌕</span>
+                <input
+                  className="w-full bg-transparent text-sm text-slate-700 outline-none"
+                  placeholder="Search products"
+                  value={productSearch}
+                  onChange={(event) => setProductSearch(event.target.value)}
+                />
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <button className="grid h-9 w-9 place-items-center rounded-full border border-[#d7d3d1] bg-white/40 text-slate-600" type="button">◐</button>
@@ -794,7 +832,12 @@ function App() {
                   <div className="mb-4 flex items-center gap-3">
                     <div className="flex flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
                       <span className="text-slate-400">⌕</span>
-                      <input className="w-full bg-transparent text-sm text-slate-700 outline-none" placeholder="Search in Existing" />
+                      <input
+                        className="w-full bg-transparent text-sm text-slate-700 outline-none"
+                        placeholder="Search in Existing"
+                        value={orderSearch}
+                        onChange={(event) => setOrderSearch(event.target.value)}
+                      />
                     </div>
                   </div>
 
@@ -833,10 +876,12 @@ function App() {
                     </div>
 
                     <div className="space-y-2">
-                      {currentOrder.length === 0 ? (
-                        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-8 text-center text-sm text-slate-500">No items selected</div>
+                      {filteredCurrentOrder.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-8 text-center text-sm text-slate-500">
+                          {currentOrder.length === 0 ? 'No items selected' : 'No matching items found'}
+                        </div>
                       ) : (
-                        currentOrder.map((item) => (
+                        filteredCurrentOrder.map((item) => (
                           <div key={item.id} className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
                             <div>
                               <div className="text-sm font-semibold text-slate-800">{item.name}</div>
